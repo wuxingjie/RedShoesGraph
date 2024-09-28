@@ -1,6 +1,6 @@
 import * as d3 from "d3";
-import { hierarchyScaleY, ScaleY } from "./axis.ts";
-import { merge } from "d3";
+import { hierarchyScaleY, hierarchyYAxis, ScaleY, timeXAxis } from "./axis.ts";
+import { eventLinks, heatmapOrLink } from "./event.ts";
 
 export type Entity = { id: string; name?: string; parentId?: string };
 
@@ -53,25 +53,6 @@ export type AdditionalEntity = Entity & {
 
 export interface RedShoesGraphMethods {}
 
-/**
- * 获取时间区间内事件
- * @param events
- */
-function rangeEvent(events: Events): (start: Date, end: Date) => Events {
-  const sorted = d3.sort(events, (a, b) =>
-    d3.ascending(a.time.start, b.time.start),
-  );
-  // 创建 bisector
-  const bisect = d3.bisector<Event, Date>((d) => d.time.start).left;
-  return (start: Date, end: Date) => {
-    // 查找开始和结束位置
-    const startIndex = bisect(sorted, start);
-    const endIndex = bisect(sorted, end);
-    // 获取区间内的所有日期
-    return sorted.slice(startIndex, endIndex);
-  };
-}
-
 export default function redShoesGraph(
   config: RedShoesGraphConfig,
 ): RedShoesGraphMethods {
@@ -82,14 +63,23 @@ export default function redShoesGraph(
     padding,
     data: { entities, events },
   } = config;
-  const supLineWidth = width - padding.right - padding.left;
+  const contentWidth = width - padding.right - padding.left;
   const groupById = d3.group(entities, (d) => String(d.id));
   const getNameById = (id: string) => groupById.get(id)?.[0].name ?? id;
-  const rangeEvents = rangeEvent(events);
   const svg = createAndSetupSvg(width, height, padding);
   const content = svg
     .append("g")
     .attr("transform", `translate(${padding.left}, ${padding.top + 20})`);
+  const color = d3.scaleOrdinal(d3.schemeCategory10);
+  const xEl = content.append("g");
+  const yEl = content.append("g");
+  const heatmapEl = content.append("g");
+  const eventLinkEl = content.append("g");
+  const xAxis = timeXAxis(xEl, events, width, padding);
+  const yAxis = hierarchyYAxis(yEl, entities, color, 30, contentWidth);
+  const eventLink = eventLinks(eventLinkEl, color);
+  const heatMapOrLink = heatmapOrLink(heatmapEl, events, eventLink, 2);
+  heatMapOrLink(xAxis.scale(), yAxis.scale());
   const root = d3
     .stratify<AdditionalEntity>()
     .id((d) => d.id)
@@ -107,14 +97,13 @@ export default function redShoesGraph(
   const nodeSize = 30;
   const nodes = root.descendants();
   const hierarchyY = hierarchyScaleY(nodes, nodeSize);
-  const color = d3.scaleOrdinal(d3.schemeCategory10);
   content
     .append("g")
     .selectAll()
     .data(nodes)
     .join("g")
     .attr("transform", (d) => `translate(0,${hierarchyY(d.data.id)})`)
-    .call(renderHierarchyYAxis, color, nodeSize, supLineWidth);
+    .call(renderHierarchyYAxis, color, nodeSize, contentWidth);
 
   content
     .append("g")
@@ -136,7 +125,7 @@ export default function redShoesGraph(
   /*svg
     .append("g")
     .call(renderYAxis, y, width, padding, getNameById)
-    .call(setYAxisStyle, supLineWidth)
+    .call(setYAxisStyle, contentWidth)
     .call(setYAxisEvent);*/
   // apply zoom
   svg.call(zoom);
@@ -240,8 +229,6 @@ function drawHeatmap(
   xScale: d3.ScaleTime<number, number>,
   yScale: ScaleY,
   events: Events,
-  removeLink: () => void,
-  drawLink: () => void,
 ) {
   const ticks = xScale.ticks();
   const tickSize = xScale(ticks[1]) - xScale(ticks[0]);
@@ -280,10 +267,8 @@ function drawHeatmap(
       .attr("height", 20)
       .attr("fill", (d) => `${color(d.count)}`)
       .attr("transform", "translate(0, -10)");
-    removeLink();
   } else {
     g.selectAll("rect").remove();
-    drawLink();
   }
 
   /* d3.select(".heatmap")
