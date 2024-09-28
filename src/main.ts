@@ -1,24 +1,48 @@
-import './style.css'
-import typescriptLogo from './typescript.svg'
-import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.ts'
+import "./style.css";
+import "./setup.ts";
+import redShoesGraph, { DataConfig } from "./redShoesGraph.ts";
+import { getRandomDateFn } from "./generateTestData.ts";
+import { randomInt } from "d3";
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div>
-    <a href="https://vitejs.dev" target="_blank">
-      <img src="${viteLogo}" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
-    </p>
-  </div>
-`
+const randomDateFn = getRandomDateFn(
+  new Date(2020, 0, 1),
+  new Date(2020, 2, 1),
+);
+//const sampleSize = 10;
+const randomNum = randomInt(9);
+const data: DataConfig = {
+  entities: [
+    { id: "0", name: "Eve", parentId: "" },
+    { id: "1", name: "Cain", parentId: "0" },
+    { id: "2", name: "Seth", parentId: "0" },
+    { id: "3", name: "Enos", parentId: "2" },
+    { id: "4", name: "Noam", parentId: "2" },
+    { id: "5", name: "Abel", parentId: "0" },
+    { id: "6", name: "Awan", parentId: "0" },
+    { id: "7", name: "Enoch", parentId: "6" },
+    { id: "8", name: "Azura", parentId: "0" },
+  ],
+  events: Array.from({ length: 100 }).map(() => {
+    return {
+      id: randomNum() + "",
+      entityIds: [randomNum() + ""],
+      type: "event",
+      time: {
+        start: randomDateFn().getTime(),
+      },
+    };
+  }),
+};
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+redShoesGraph({
+  container: document.querySelector<HTMLDivElement>("#app")!,
+  width: 800,
+  height: 500,
+  padding: {
+    top: 20,
+    right: 20,
+    bottom: 20,
+    left: 50,
+  },
+  data,
+});
