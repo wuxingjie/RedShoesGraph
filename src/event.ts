@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { ScaleY } from "./axis.ts";
+import { HierarchyYAxis, ScaleY } from "./axis.ts";
 import { Events } from "./redShoesGraph.ts";
 import type { Event } from "./redShoesGraph.ts";
 
@@ -26,8 +26,11 @@ export function eventLinks(
       .data(events)
       .join("g")
       .attr("class", "arrowLine");
+    // 第一节线段
     linkGroups
-      .append("path")
+      .selectAll("path.path1")
+      .data((d) => [d])
+      .join("path")
       .attr("class", "path1")
       .attr("stroke-width", "2")
       .attr("d", (d) => {
@@ -37,8 +40,11 @@ export function eventLinks(
         return `M ${x1},${y1} v ${(y2 - y1) / 2}`;
       })
       .attr("stroke", (d) => `${color(d.entityIds[0])}`);
+    // 第二节线段
     linkGroups
-      .append("path")
+      .selectAll("path.path2")
+      .data((d) => [d])
+      .join("path")
       .attr("class", "path2")
       .attr("stroke-width", "2")
       .attr("d", (d) => {
@@ -50,6 +56,7 @@ export function eventLinks(
       .attr("fill", "none")
       .attr("stroke", (d) => `${color(d.id)}`)
       .attr("marker-end", "url(#arrow)");
+
     // 画点
     linkPoints
       .selectAll("circle")
@@ -62,13 +69,14 @@ export function eventLinks(
   }
 
   render.remove = () => {
-    container.remove();
+    links.selectAll("g").remove();
+    linkPoints.selectAll("circle").remove();
   };
   return render;
 }
 
 export interface Heatmap {
-  (xScale: d3.ScaleTime<number, number>, yScale: ScaleY): void;
+  (xScale: d3.ScaleTime<number, number>, yAxis: HierarchyYAxis): this;
 }
 
 /**
@@ -88,7 +96,8 @@ export function heatmapOrLink(
   const rangeEvents = rangeEvent(events);
   const allEventById = d3.group(events, (d) => d.id);
 
-  function render(xScale: d3.ScaleTime<number, number>, yScale: ScaleY) {
+  function render(xScale: d3.ScaleTime<number, number>, yAxis: HierarchyYAxis) {
+    const yScale = yAxis.scale();
     const ticks = xScale.ticks();
     const numTicks = ticks.map((d) => d.getTime());
     const { 0: start, 1: end } = xScale.domain();
@@ -100,46 +109,49 @@ export function heatmapOrLink(
       filteredEvents.length < events.length
         ? d3.group(filteredEvents, (d) => d.id)
         : allEventById;
+    // 配置并且重新渲染X坐标轴，只显示对应区间的维度
+    yAxis.withScale((s) => s.domain(Array.from(eventById.keys())))();
+    const bisect = d3
+      .bin<Event, number>()
+      .value((d) => d.time.start)
+      .domain(xDomain)
+      .thresholds(numTicks);
     // TODO 父节点收缩起来考虑使用Rollup
     const idAndBins = d3.map(eventById.keys(), (id) => {
-      const events = eventById.get(id) as Event[];
-      const bisect = d3
-        .bin<Event, number>()
-        .value((d) => d.time.start)
-        .domain(xDomain)
-        .thresholds(numTicks);
-      const bins = bisect(events).map((b) => ({
-        x0: b.x0,
-        x1: b.x1,
-        count: b.length,
-      }));
+      const bins = bisect(eventById.get(id) as Event[])
+        .filter((d) => d.length > 0) // 过滤掉空数组,空的没必要显示
+        .map((b) => ({
+          id,
+          x0: b.x0,
+          x1: b.x1,
+          count: b.length,
+        }));
       return { id, bins };
     });
     // 通过操作阈值的数量
-    const count = d3.sum(idAndBins, (d) =>
+    const thresholdCount = d3.sum(idAndBins, (d) =>
       d3.sum(d.bins, (d) => (d.count > thresholdSize ? 1 : 0)),
     );
+    const count = d3.sum(idAndBins, (d) => d.bins.length);
     const maxCount =
       d3.max(idAndBins, (d) => d3.max(d.bins, (d) => d.count)) ?? 10;
     const color = d3.scaleLinear([0, maxCount], ["white", "orange"]);
-    const percentage = count / events.length;
-    // 如果大于50%的都超过了阈值
-    if (percentage > 0.5) {
+    const percentage = thresholdCount / count;
+    // 如果阈值显示热力图
+    if (percentage > 0.1) {
       container
         .selectAll("g")
         .data(idAndBins)
         .join("g")
-        .call((g) => {
-          g.selectAll("rect")
-            .data((d) => d.bins)
-            .join("rect")
-            .attr("x", (d) => xScale(d.x0!))
-            .attr("y", yScale(g.datum().id) ?? 0)
-            .attr("width", (d) => xScale(d.x1!) - xScale(d.x0!))
-            .attr("height", 20)
-            .attr("fill", (d) => `${color(d.count)}`)
-            .attr("transform", "translate(0, -10)");
-        });
+        .selectAll("rect")
+        .data((d) => d.bins)
+        .join("rect")
+        .attr("x", (d) => xScale(d.x0!))
+        .attr("y", (d) => yScale(d.id) ?? 0)
+        .attr("width", (d) => xScale(d.x1!) - xScale(d.x0!))
+        .attr("height", 20)
+        .attr("fill", (d) => `${color(d.count)}`)
+        .attr("transform", "translate(0, -10)");
       // 移除事件节点连线
       eventLink.remove();
     } else {
@@ -148,6 +160,7 @@ export function heatmapOrLink(
       // 画事件节点连线
       eventLink(xScale, yScale, filteredEvents);
     }
+    return render;
   }
   return render;
 }

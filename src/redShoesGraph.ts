@@ -1,5 +1,5 @@
 import * as d3 from "d3";
-import { hierarchyScaleY, hierarchyYAxis, ScaleY, timeXAxis } from "./axis.ts";
+import { hierarchyYAxis, ScaleY, timeXAxis } from "./axis.ts";
 import { eventLinks, heatmapOrLink } from "./event.ts";
 
 export type Entity = { id: string; name?: string; parentId?: string };
@@ -48,7 +48,7 @@ export interface RedShoesGraphConfig {
 export type AdditionalEntity = Entity & {
   index: number; // tree index
   collapse: false; // 折叠
-  show: true; // 更加当前X轴的时间区间是否显示
+  show: true; // 当前X轴的时间区间是否显示
 };
 
 export interface RedShoesGraphMethods {}
@@ -71,83 +71,29 @@ export default function redShoesGraph(
     .append("g")
     .attr("transform", `translate(${padding.left}, ${padding.top + 20})`);
   const color = d3.scaleOrdinal(d3.schemeCategory10);
-  const xEl = content.append("g");
+  const xEl = svg.append("g");
   const yEl = content.append("g");
   const heatmapEl = content.append("g");
   const eventLinkEl = content.append("g");
-  const xAxis = timeXAxis(xEl, events, width, padding);
-  const yAxis = hierarchyYAxis(yEl, entities, color, 30, contentWidth);
+  const xAxis = timeXAxis(xEl, events, width, padding)();
+  const yAxis = hierarchyYAxis(yEl, entities, color, 30, contentWidth)();
   const eventLink = eventLinks(eventLinkEl, color);
-  const heatMapOrLink = heatmapOrLink(heatmapEl, events, eventLink, 2);
-  heatMapOrLink(xAxis.scale(), yAxis.scale());
-  const root = d3
-    .stratify<AdditionalEntity>()
-    .id((d) => d.id)
-    .parentId((d) => d.parentId)(
-      // 注意下面eachBefore里面修改了index属性
-      // map 一下，避免修改原始对象，看情况其实也可以自己修改原始对象
-      entities.map((e) => ({ ...e, index: 0 })) as AdditionalEntity[],
-    )
-    .eachBefore(
-      (
-        (i) => (d) =>
-          (d.data.index = i++)
-      )(0),
-    );
-  const nodeSize = 30;
-  const nodes = root.descendants();
-  const hierarchyY = hierarchyScaleY(nodes, nodeSize);
-  content
-    .append("g")
-    .selectAll()
-    .data(nodes)
-    .join("g")
-    .attr("transform", (d) => `translate(0,${hierarchyY(d.data.id)})`)
-    .call(renderHierarchyYAxis, color, nodeSize, contentWidth);
-
-  content
-    .append("g")
-    .attr("class", "yAxisLinks")
-    .attr("fill", "none")
-    .attr("stroke", "#999")
-    .selectAll()
-    .data(root.links())
-    .call(renderHierarchyYAxisLinks, hierarchyY, nodeSize);
-  const x = createScaleX(events, width, padding);
-  // const y = createScaleY(entities, height, padding);
+  const heatMapOrLink = heatmapOrLink(
+    heatmapEl,
+    events,
+    eventLink,
+    2,
+  )(xAxis.scale(), yAxis);
+  const originalXScale = xAxis.scale();
   const zoom = d3.zoom<SVGSVGElement, any>().on("zoom", (e) => {
-    const rx = zoomed(e, x, hierarchyY, width, height, padding);
-    drawHeatmap(svg.select(".heatmap"), rx, hierarchyY, events);
+    // 重新计算比例尺
+    const rx = e.transform.rescaleX(originalXScale);
+    xAxis.setScale(rx)(); // 重新渲染X轴
+    heatMapOrLink(rx, yAxis); // 重新渲染事件连线或者热力图
   });
-  // 渲染X轴
-  svg.append("g").call(renderXAxis, x, width, height, padding);
-  // 渲染Y轴
-  /*svg
-    .append("g")
-    .call(renderYAxis, y, width, padding, getNameById)
-    .call(setYAxisStyle, contentWidth)
-    .call(setYAxisEvent);*/
-  // apply zoom
-  svg.call(zoom);
-  // 渲染节点连线
-  content
-    .append("g")
-    .attr("class", "links")
-    .attr("clip-path", "url(#clipView)")
-    .call(drawLinks, events, x, hierarchyY, color);
-  // 渲染event节点
-  content
-    .append("g")
-    .attr("clip-path", "url(#clipView)")
-    .call(drawNodes, events, x, hierarchyY, color);
-  // 节点Tooltip
-  svg.call(drawTooltip, events, getNameById);
+  svg.call(zoom); // 绑定 zoom 事件
 
-  // 热力图
-  content
-    .append("g")
-    .attr("class", "heatmap")
-    .call(drawHeatmap, x, hierarchyY, events);
+  //svg.call(drawTooltip, events, getNameById);
 
   config.container.appendChild(svg.node()!);
 
