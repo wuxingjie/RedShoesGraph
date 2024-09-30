@@ -1,5 +1,6 @@
 import * as d3 from "d3";
 import { Entities, Entity, Events, Padding } from "./redShoesGraph.ts";
+import { hierarchy } from "d3";
 
 export interface ScaleY {
   (id: string): number | undefined;
@@ -16,30 +17,32 @@ export type AdditionalEntity = Entity & {
 };
 
 export function hierarchyScaleY(entities: Entities, nodeSize: number): ScaleY {
-  const root = d3
-    .stratify<AdditionalEntity>()
-    .id((d) => d.id)
-    .parentId((d) => d.parentId)(
-      // 注意下面eachBefore里面修改了index属性
-      // map 一下，避免修改原始对象，看情况其实也可以自己修改原始对象
-      entities.map((e) => ({ ...e, index: 0 })) as AdditionalEntity[],
-    )
-    .eachBefore(
-      ((i) => (d) => {
-        d.data.index = i++;
-        d.data.show = true;
-        d.data.collapse = false;
-      })(0),
-    );
+  function createRootNode(entities: Entities) {
+    return d3
+      .stratify<AdditionalEntity>()
+      .id((d) => d.id)
+      .parentId((d) => d.parentId)(
+        // 注意下面eachBefore里面添加了一些属性,所以as AdditionalEntity[]
+        entities as AdditionalEntity[],
+      )
+      .eachBefore(
+        ((i) => (d) => {
+          d.data.index = i++;
+          d.data.show = true;
+          d.data.collapse = false;
+        })(0),
+      );
+  }
+  let root = createRootNode(entities);
   const nodes = root.descendants();
-  const linear = d3.scaleLinear(
-    [0, nodes.length - 1],
+  const nodesById = new Map(nodes.map((n) => [n.data.id, n]));
+  const _scale = d3.scaleLinear(
+    [0, nodes.length],
     [0, nodes.length * nodeSize],
   );
-  const nodesById = new Map(nodes.map((n) => [n.data.id, n]));
   function scaleY(id: string): number | undefined {
     const index = nodesById.get(id)?.data.index;
-    return index !== undefined ? linear(index) : undefined;
+    return index !== undefined ? _scale(index) : undefined;
   }
 
   let domainValues: string[] = entities.map((e) => e.id);
@@ -50,22 +53,31 @@ export function hierarchyScaleY(entities: Entities, nodeSize: number): ScaleY {
       domainValues = ids;
       return scaleY;
     } else {
-      return nodes.map((n) => n.data.id);
+      return domainValues;
     }
   }
 
   function ticks(): d3.HierarchyNode<AdditionalEntity>[] {
-    function filteredNodes(n: d3.HierarchyNode<AdditionalEntity>): boolean {
-      return (n.data.show || n.children?.some(filteredNodes)) ?? false;
-    }
-    let i = 0;
-    return nodes.filter(filteredNodes).map((n) => {
-      n.data.index = i++;
-      return n;
+    const filtered = new Map<string, Entity>();
+    domainValues.forEach((id) => {
+      const n = nodesById.get(id)!;
+      for (const ancestor of n.ancestors() ?? []) {
+        if (filtered.has(ancestor.data.id)) {
+          break;
+        } else {
+          filtered.set(ancestor.data.id, ancestor.data);
+        }
+      }
     });
+    if (filtered.size === 0) {
+      root = d3.hierarchy({} as AdditionalEntity);
+      return [];
+    }
+    root = createRootNode(Array.from(filtered.values()));
+    return root.descendants();
   }
   function links(): d3.HierarchyLink<AdditionalEntity>[] {
-    return root.links().filter((l) => l.source.data.show || l.target.data.show);
+    return root.links();
   }
   scaleY.domain = domain;
   scaleY.ticks = ticks;
