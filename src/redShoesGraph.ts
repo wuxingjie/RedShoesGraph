@@ -1,6 +1,7 @@
 import * as d3 from "d3";
 import { hierarchyYAxis, ScaleY, timeXAxis } from "./axis.ts";
-import { eventLinks, heatmapOrLink } from "./event.ts";
+import { eventHeatmapMarker, eventLinksMarker, eventMarker } from "./event.ts";
+import { scrollBar, scrollYMarker } from "./scrollBar.ts";
 
 export type Entity = { id: string; name?: string; parentId?: string };
 
@@ -64,8 +65,9 @@ export default function redShoesGraph(
     data: { entities, events },
   } = config;
   const contentWidth = width - padding.right - padding.left;
-  const groupById = d3.group(entities, (d) => String(d.id));
-  const getNameById = (id: string) => groupById.get(id)?.[0].name ?? id;
+  const contentHeight = height - padding.top - padding.bottom;
+  //const groupById = d3.group(entities, (d) => String(d.id));
+  //const getNameById = (id: string) => groupById.get(id)?.[0].name ?? id;
   const svg = createAndSetupSvg(width, height, padding);
   const content = svg
     .append("g")
@@ -75,25 +77,55 @@ export default function redShoesGraph(
   const yEl = content.append("g");
   const heatmapEl = content.append("g");
   const eventLinkEl = content.append("g");
+  const eventLink = eventLinksMarker(eventLinkEl, color);
+  const eventHeatmap = eventHeatmapMarker(heatmapEl);
+  const heatMapOrLink = eventMarker(events, eventLink, eventHeatmap, 2);
   const xAxis = timeXAxis(xEl, events, width, padding)();
-  const yAxis = hierarchyYAxis(yEl, entities, color, 30, contentWidth)();
-  const eventLink = eventLinks(eventLinkEl, color);
-  const heatMapOrLink = heatmapOrLink(
-    heatmapEl,
-    events,
-    eventLink,
-    2,
-  )(xAxis.scale(), yAxis);
+  const yAxisScrollBar = scrollBar(contentHeight, contentHeight);
+  const yAxis = hierarchyYAxis(
+    yEl,
+    heatMapOrLink,
+    entities,
+    yAxisScrollBar,
+    color,
+    30,
+    contentWidth,
+  );
+  heatMapOrLink.xScale(xAxis.scale()).yAxis(yAxis)(); // 根据区间渲染事件和Y轴
+  // 渲染Y轴滚动条
+  const yAxisScrollMarker = scrollYMarker(yAxisScrollBar).offset(-10)(yEl);
   const originalXScale = xAxis.scale();
-  const zoom = d3.zoom<SVGSVGElement, any>().on("zoom", (e) => {
+  const globalZoomEvent = d3.zoom<SVGSVGElement, any>().on("zoom", (e) => {
     // 重新计算比例尺
     const rx = e.transform.rescaleX(originalXScale);
     xAxis.setScale(rx)(); // 重新渲染X轴
-    heatMapOrLink(rx, yAxis); // 重新渲染事件连线或者热力图
+    heatMapOrLink.xScale(rx)(); // 重新渲染事件连线或者热力图
   });
-  svg.call(zoom); // 绑定 zoom 事件
+  svg.call(globalZoomEvent); //  绑定全局 zoom 事件
 
-  //svg.call(drawTooltip, events, getNameById);
+  const yAxisScrollEvent = d3
+    .zoom<SVGGElement, any>()
+    //.scaleExtent([1, 1]) // 固定缩放比例为1，只允许平移
+    .wheelDelta((e) => {
+      console.log("wheel", e);
+      console.log("e.deltaY", e.deltaY);
+      return e.deltaY;
+    })
+    .on("zoom", (e) => {
+      console.log("滚动。。。");
+      // 获取滚动增量（根据事件的 deltaY）
+      const deltaY = e.transform.y;
+      console.log(deltaY);
+      const scrollBy = yAxisScrollBar.scrollBy(deltaY);
+      yEl.call(yAxisScrollMarker.scrollBar(scrollBy));
+      // yAxis.withScale((s) => s.ra);
+      yAxis.scale().rangeStartOffset(-scrollBy().offset);
+      heatMapOrLink();
+    });
+  yEl.call(yAxisScrollEvent);
+  yEl.on("wheel", (e) => {
+    e.stopPropagation();
+  });
 
   config.container.appendChild(svg.node()!);
 

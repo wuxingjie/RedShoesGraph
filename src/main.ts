@@ -9,7 +9,7 @@ const randomDateFn = getRandomDateFn(
   new Date(2020, 2, 1),
 );
 //const sampleSize = 10;
-const randomNum = randomInt(9);
+const randomNum = randomInt(17);
 const data: DataConfig = {
   entities: [
     { id: "0", name: "Eve", parentId: "" },
@@ -21,8 +21,16 @@ const data: DataConfig = {
     { id: "6", name: "Awan", parentId: "0" },
     { id: "7", name: "Enoch", parentId: "6" },
     { id: "8", name: "Azura", parentId: "0" },
+    { id: "9", name: "asd", parentId: "0" },
+    { id: "10", name: "dff", parentId: "0" },
+    { id: "11", name: "adfa", parentId: "0" },
+    { id: "12", name: "gh", parentId: "0" },
+    { id: "13", name: "gdfth", parentId: "0" },
+    { id: "14", name: "dfgh", parentId: "0" },
+    { id: "15", name: "ert", parentId: "0" },
+    { id: "16", name: "end", parentId: "0" },
   ],
-  events: Array.from({ length: 100 }).map(() => {
+  events: Array.from({ length: 1000 }).map(() => {
     return {
       id: randomNum() + "",
       entityIds: [randomNum() + ""],
