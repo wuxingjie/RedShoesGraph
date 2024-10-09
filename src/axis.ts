@@ -7,7 +7,7 @@ export interface ScaleY {
   (id: string): number | undefined;
   domain(): string[];
   domain(ids: string[]): this;
-  rangeStartOffset(n: number): this;
+  rangeOffset(n: number): this;
   ticks(): d3.HierarchyNode<AdditionalEntity>[];
   links(): d3.HierarchyLink<AdditionalEntity>[];
 }
@@ -35,6 +35,7 @@ export function hierarchyScaleY(entities: Entities, nodeSize: number): ScaleY {
         })(0),
       );
   }
+
   let root = createRootNode(entities);
   const nodes = root.descendants();
   const nodesById = new Map(nodes.map((n) => [n.data.id, n]));
@@ -60,7 +61,7 @@ export function hierarchyScaleY(entities: Entities, nodeSize: number): ScaleY {
   }
 
   const [start, end] = _scale.range();
-  function rangeStartOffset(n: number): ScaleY {
+  function rangeOffset(n: number): ScaleY {
     _scale.range([start + n, end + n]);
     return scaleY;
   }
@@ -73,7 +74,7 @@ export function hierarchyScaleY(entities: Entities, nodeSize: number): ScaleY {
         if (!filtered.has(ancestor.data.id)) {
           filtered.set(ancestor.data.id, ancestor.data);
         }
-        // 如果节点collapse， break掉，子节点就不会加入进来
+        // 如果节点collapse,break掉,子节点就不会加入进来
         if (ancestor.data.collapse) break;
       }
     });
@@ -92,7 +93,7 @@ export function hierarchyScaleY(entities: Entities, nodeSize: number): ScaleY {
   }
 
   scaleY.domain = domain;
-  scaleY.rangeStartOffset = rangeStartOffset;
+  scaleY.rangeOffset = rangeOffset;
   scaleY.ticks = ticks;
   scaleY.links = links;
   return scaleY;
@@ -121,12 +122,12 @@ export function hierarchyYAxis(
     .attr("height", 200)
     .attr("fill", "transparent");
   let scaleY = hierarchyScaleY(entities, nodeSize);
-  const ticks = container.append("g").attr("class", "ticks");
   const yAxisLinks = container
     .append("g")
     .attr("class", "yAxisLinks")
     .attr("fill", "none")
     .attr("stroke", "#999");
+  const ticks = container.append("g").attr("class", "ticks");
 
   function render() {
     const yTicks = scaleY.ticks();
@@ -134,6 +135,19 @@ export function hierarchyYAxis(
     // 设置滚动条内容高度
     scrollBar.contentLength(contentLength);
     transparent.attr("height", contentLength);
+    // 父子连线
+    yAxisLinks
+      .selectAll("path")
+      .data(scaleY.links())
+      .join("path")
+      .attr(
+        "d",
+        (d) => `
+        M${d.source.depth * nodeSize}, ${scaleY(d.source.data.id)}
+        V${scaleY(d.target.data.id)}
+        h${nodeSize}
+      `,
+      );
     const tickGroup = ticks
       .selectAll("g")
       .data(yTicks)
@@ -179,7 +193,7 @@ export function hierarchyYAxis(
     tickGroup
       .selectAll("title")
       .data((d) => [d])
-      .join("line")
+      .join("title")
       .text((d) =>
         d
           .ancestors()
@@ -188,19 +202,6 @@ export function hierarchyYAxis(
           .join("/"),
       );
 
-    // 父子连线
-    yAxisLinks
-      .selectAll("path")
-      .data(scaleY.links())
-      .join("path")
-      .attr(
-        "d",
-        (d) => `
-        M${d.source.depth * nodeSize}, ${scaleY(d.source.data.id)}
-        V${scaleY(d.target.data.id)}
-        h${nodeSize}
-      `,
-      );
     return render;
   }
   render.scale = () => scaleY;

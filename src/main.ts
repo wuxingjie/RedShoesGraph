@@ -30,7 +30,7 @@ const data: DataConfig = {
     { id: "15", name: "ert", parentId: "0" },
     { id: "16", name: "end", parentId: "0" },
   ],
-  events: Array.from({ length: 1000 }).map(() => {
+  events: Array.from({ length: 10000 }).map(() => {
     return {
       id: randomNum() + "",
       entityIds: [randomNum() + ""],

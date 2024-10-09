@@ -195,7 +195,7 @@ export function eventMarker(
       .thresholds(numTicks);
     // TODO 父节点收缩起来考虑使用Rollup
     const idAndBins = d3.map(
-      yScale.ticks().map((t) => t.data.id),
+      yScale.ticks().map((t) => t.data.id), // 只显示Y轴对应的热力图
       (id) => {
         const bins = bisect(allEventById.get(id) as Event[])
           .filter((d) => d.length > 0) // 过滤掉空数组,空的没必要显示

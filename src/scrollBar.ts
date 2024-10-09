@@ -9,6 +9,10 @@ export interface ScrollBar {
   contentLength(): number;
   contentLength(length: number): this;
   scrollBy(delta: number): this;
+  canScrollBy(delta: number): boolean;
+  thumbOffset(): number;
+  thumbLength(): number;
+  canScroll(): boolean;
 }
 
 export function scrollBar(
@@ -18,23 +22,11 @@ export function scrollBar(
   let _containerLength = containerLength;
   let _contentLength = contentLength;
   let _thumbOffset = 0;
-  let _delta = 0;
-
   function fn(): ScrollState {
-    const canScroll = _contentLength > _containerLength; // 判断是否可以滚动
-    const thumbLength = canScroll
-      ? (_containerLength / _contentLength) * _containerLength
-      : _containerLength;
-    if (canScroll) {
-      _thumbOffset = Math.max(
-        0,
-        Math.min(_contentLength - _containerLength, _thumbOffset + _delta),
-      );
-    }
     return {
-      thumbLength,
-      offset: _thumbOffset,
-      canScroll, // 是否可滚动的状态
+      thumbLength: fn.thumbLength(),
+      offset: fn.thumbOffset(),
+      canScroll: fn.canScroll(), // 是否可滚动的状态
     };
   }
 
@@ -61,8 +53,37 @@ export function scrollBar(
   fn.contentLength = contentLengthFn;
 
   fn.scrollBy = (delta: number): ScrollBar => {
-    _delta = delta;
+    _thumbOffset = Math.max(
+      0,
+      Math.min(_contentLength - _containerLength, _thumbOffset + delta),
+    );
     return fn;
+  };
+
+  fn.canScrollBy = (delta: number): boolean => {
+    const expectThumbOffset = _thumbOffset + delta;
+    return (
+      expectThumbOffset >= 0 &&
+      expectThumbOffset <= _contentLength - _containerLength
+    );
+  };
+
+  fn.thumbOffset = (): number => {
+    return _thumbOffset;
+  };
+
+  fn.thumbLength = (): number => {
+    return Math.min(
+      (_containerLength / _contentLength) * _containerLength,
+      _containerLength,
+    );
+  };
+
+  fn.canScroll = (): boolean => {
+    return (
+      _contentLength > _containerLength &&
+      fn.thumbLength() + fn.thumbOffset() < _containerLength
+    );
   };
 
   return fn;
