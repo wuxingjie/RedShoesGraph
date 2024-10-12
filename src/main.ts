@@ -9,7 +9,7 @@ const randomDateFn = getRandomDateFn(
   new Date(2020, 2, 1),
 );
 //const sampleSize = 10;
-const randomNum = randomInt(17);
+const randomNum = randomInt(18);
 const data: DataConfig = {
   entities: [
     { id: "0", name: "Eve", parentId: "" },
@@ -29,6 +29,7 @@ const data: DataConfig = {
     { id: "14", name: "dfgh", parentId: "0" },
     { id: "15", name: "ert", parentId: "0" },
     { id: "16", name: "end", parentId: "0" },
+    { id: "17", name: "end1", parentId: "16" },
   ],
   events: Array.from({ length: 10000 }).map(() => {
     return {
@@ -45,7 +46,7 @@ const data: DataConfig = {
 redShoesGraph({
   container: document.querySelector<HTMLDivElement>("#app")!,
   width: 800,
-  height: 500,
+  height: 200,
   padding: {
     top: 20,
     right: 20,

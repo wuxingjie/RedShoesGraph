@@ -2,6 +2,7 @@ import * as d3 from "d3";
 import { HierarchyYAxis, ScaleY } from "./axis.ts";
 import { Events } from "./redShoesGraph.ts";
 import type { Event } from "./redShoesGraph.ts";
+import { EventData } from "./data.ts";
 
 export interface EventLinkMarker {
   (x: d3.ScaleTime<number, number>, y: ScaleY, events: Events): this;
@@ -23,7 +24,11 @@ export function eventLinksMarker(
     // 画线
     const linkGroups = links
       .selectAll("g")
-      .data(events)
+      .data(
+        events.filter(
+          (d) => y(d.id) !== undefined && y(d.entityIds[0]) !== undefined,
+        ),
+      )
       .join("g")
       .attr("class", "arrowLine");
     // 第一节线段
@@ -60,7 +65,7 @@ export function eventLinksMarker(
     // 画点
     linkPoints
       .selectAll("circle")
-      .data(events)
+      .data(events.filter((d) => y(d.id) !== undefined))
       .join("circle")
       .attr("cx", (d) => x(d.time.start))
       .attr("cy", (d) => y(d.id) || null)
@@ -147,14 +152,11 @@ export interface EventMarker {
  * @param thresholdSize 单个格子的数量限制,超过就画热力图
  */
 export function eventMarker(
-  events: Events,
+  events: EventData,
   eventLink: EventLinkMarker,
   eventHeatmap: EventHeatmapMaker,
   thresholdSize: number,
 ): EventMarker {
-  const rangeEvents = rangeEvent(events);
-  const allEventById = d3.group(events, (d) => d.id);
-
   let _xScale: d3.ScaleTime<number, number> | undefined = undefined;
   let _yAxis: HierarchyYAxis | undefined = undefined;
 
@@ -175,7 +177,7 @@ export function eventMarker(
     const { 0: start, 1: end } = xScale.domain();
     const xDomain: [number, number] = [start.getTime(), end.getTime()];
     // TODO 后面可以优化成:先获取id对应的数据,然后再过滤
-    const filteredEvents = rangeEvents(start, end);
+    const filteredEvents = events(start, end);
     /*// 过滤出的事件比总的小, 就是过滤出来的,不然直接用全部的
     const eventById =
       filteredEvents.length < events.length
@@ -197,7 +199,7 @@ export function eventMarker(
     const idAndBins = d3.map(
       yScale.ticks().map((t) => t.data.id), // 只显示Y轴对应的热力图
       (id) => {
-        const bins = bisect(allEventById.get(id) as Event[])
+        const bins = bisect(events(id))
           .filter((d) => d.length > 0) // 过滤掉空数组,空的没必要显示
           .map((b) => ({
             id,
@@ -238,25 +240,6 @@ export function eventMarker(
   };
 
   return render;
-}
-
-/**
- * 获取时间区间内事件
- * @param events
- */
-function rangeEvent(events: Events): (start: Date, end: Date) => Events {
-  const sorted = d3.sort(events, (a, b) =>
-    d3.ascending(a.time.start, b.time.start),
-  );
-  // 创建 bisector
-  const bisect = d3.bisector<Event, Date>((d) => d.time.start).left;
-  return (start: Date, end: Date) => {
-    // 查找开始和结束位置
-    const startIndex = bisect(sorted, start);
-    const endIndex = bisect(sorted, end);
-    // 获取区间内的所有日期
-    return sorted.slice(startIndex, endIndex);
-  };
 }
 
 function eventNodeTooltip(

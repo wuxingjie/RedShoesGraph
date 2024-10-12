@@ -9,6 +9,8 @@ export interface ScrollBar {
   contentLength(): number;
   contentLength(length: number): this;
   scrollBy(delta: number): this;
+  scrollOffset(): number;
+  scrollOffset(offset: number): this;
   canScrollBy(delta: number): boolean;
   thumbOffset(): number;
   thumbLength(): number;
@@ -21,7 +23,7 @@ export function scrollBar(
 ): ScrollBar {
   let _containerLength = containerLength;
   let _contentLength = contentLength;
-  let _thumbOffset = 0;
+  let _scrollOffset = 0;
   function fn(): ScrollState {
     return {
       thumbLength: fn.thumbLength(),
@@ -48,28 +50,39 @@ export function scrollBar(
       _contentLength = h;
       return fn;
     }
-    return _containerLength;
+    return _contentLength;
   }
   fn.contentLength = contentLengthFn;
 
   fn.scrollBy = (delta: number): ScrollBar => {
-    _thumbOffset = Math.max(
-      0,
-      Math.min(_contentLength - _containerLength, _thumbOffset + delta),
-    );
+    scrollOffsetFn((_scrollOffset += delta));
     return fn;
   };
 
+  function scrollOffsetFn(): number;
+  function scrollOffsetFn(offset: number): ScrollBar;
+  function scrollOffsetFn(offset?: number): number | ScrollBar {
+    if (offset !== undefined) {
+      _scrollOffset = Math.min(offset, _contentLength - _containerLength);
+      return fn;
+    }
+    return Math.min(_scrollOffset, _contentLength - _containerLength);
+  }
+
+  fn.scrollOffset = scrollOffsetFn;
+
   fn.canScrollBy = (delta: number): boolean => {
-    const expectThumbOffset = _thumbOffset + delta;
+    const scrollOffset = scrollOffsetFn() + delta;
     return (
-      expectThumbOffset >= 0 &&
-      expectThumbOffset <= _contentLength - _containerLength
+      scrollOffset <= _contentLength - _containerLength && scrollOffset >= 0
     );
   };
 
   fn.thumbOffset = (): number => {
-    return _thumbOffset;
+    const maxThumbOffset = _containerLength - fn.thumbLength();
+    return (
+      maxThumbOffset * (scrollOffsetFn() / (_contentLength - _containerLength))
+    );
   };
 
   fn.thumbLength = (): number => {
@@ -80,10 +93,7 @@ export function scrollBar(
   };
 
   fn.canScroll = (): boolean => {
-    return (
-      _contentLength > _containerLength &&
-      fn.thumbLength() + fn.thumbOffset() < _containerLength
-    );
+    return _contentLength > _containerLength;
   };
 
   return fn;
@@ -92,6 +102,7 @@ export function scrollBar(
 export interface ScrollBarMarker {
   (container: d3.Selection<SVGGElement, undefined, null, undefined>): this;
 
+  scrollBar(): ScrollBar;
   scrollBar(s: ScrollBar): this;
 
   /**
@@ -139,10 +150,18 @@ export function scrollBarMarker(
     return fn;
   }
 
-  fn.scrollBar = (s: ScrollBar) => {
-    _scrollBar = s;
-    return fn;
-  };
+  fn.scrollBar = (function () {
+    function f(): ScrollBar;
+    function f(s: ScrollBar): ScrollBarMarker;
+    function f(s?: ScrollBar): ScrollBarMarker | ScrollBar {
+      if (s !== undefined) {
+        _scrollBar = s;
+        return fn;
+      }
+      return _scrollBar;
+    }
+    return f;
+  })();
 
   fn.offset = (n: number) => {
     _offset = n;

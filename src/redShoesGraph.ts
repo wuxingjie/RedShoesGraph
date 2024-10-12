@@ -60,6 +60,7 @@ export default function redShoesGraph(
   } = config;
   const contentWidth = width - padding.right - padding.left;
   const contentHeight = height - padding.top - padding.bottom;
+  const nodeSize = 20;
   //const groupById = d3.group(entities, (d) => String(d.id));
   //const getNameById = (id: string) => groupById.get(id)?.[0].name ?? id;
   const svg = createAndSetupSvg(width, height, padding);
@@ -76,25 +77,27 @@ export default function redShoesGraph(
   const heatMapOrLink = eventMarker(events, eventLink, eventHeatmap, 2);
   const xAxis = timeXAxis(xEl, events, width, padding)();
   const yAxisScrollBar = scrollBar(contentHeight, contentHeight);
+  // 渲染Y轴滚动条
+  const yAxisScrollMarker = scrollYMarker(yAxisScrollBar).offset(-10);
   const yAxis = hierarchyYAxis(
     yEl,
     heatMapOrLink,
     entities,
-    yAxisScrollBar,
+    yAxisScrollMarker,
     color,
-    30,
+    nodeSize,
     contentWidth,
+    contentHeight,
   );
   heatMapOrLink.xScale(xAxis.scale()).yAxis(yAxis)(); // 根据区间渲染事件和Y轴
-  // 渲染Y轴滚动条
-  const yAxisScrollMarker = scrollYMarker(yAxisScrollBar).offset(-10)(yEl);
+  yAxisScrollMarker(yEl);
   const originalXScale = xAxis.scale();
   const globalZoomEvent = d3.zoom<SVGSVGElement, any>().on("zoom", (e) => {
     // 重新计算比例尺
     const rx = e.transform.rescaleX(originalXScale);
-    xAxis.setScale(rx)(); // 重新渲染X轴
+    xAxis.setScale(rx)(); // 设置X轴scale
+    // yAxisScrollBar.scrollOffset(0); // 重置滚动条
     heatMapOrLink.xScale(rx)(); // 重新渲染事件连线或者热力图
-    yAxisScrollMarker(yEl); // 重新渲染Y轴滚动条
   });
   svg.call(globalZoomEvent).on("dblclick.zoom", null); //  绑定全局 zoom 事件
 
@@ -113,12 +116,11 @@ export default function redShoesGraph(
     e.stopPropagation();
     console.log("wheel");
     // 每次滚动的固定偏移量
-    const dy = 30;
+    const dy = nodeSize;
     const deltaY = e.deltaY < 0 ? -dy : dy;
     if (yAxisScrollBar.canScrollBy(deltaY)) {
       const scrollBy = yAxisScrollBar.scrollBy(deltaY);
       yEl.call(yAxisScrollMarker.scrollBar(scrollBy));
-      yAxis.scale().rangeOffset(-scrollBy.thumbOffset());
       heatMapOrLink();
       //const newTransform = d3.zoomIdentity.translate(0, y);
       // 应用新的变换
