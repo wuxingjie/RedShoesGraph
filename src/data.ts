@@ -67,10 +67,10 @@ export function eventData(events: Events): EventData {
       } else {
         return grouped.get(startOrId) ?? [];
       }
-    } else if (startOrEnd && end) {
+    } else if (startOrId && startOrEnd) {
       // 查找开始和结束位置
-      const startIndex = bisect(sorted, startOrEnd);
-      const endIndex = bisect(sorted, end);
+      const startIndex = bisect(sorted, startOrId);
+      const endIndex = bisect(sorted, startOrEnd);
       // 获取区间内的所有日期
       return sorted.slice(startIndex, endIndex);
     }

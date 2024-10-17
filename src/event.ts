@@ -114,10 +114,10 @@ export function eventHeatmapMarker(
   ): EventHeatmapMaker {
     const maxCount =
       d3.max(idAndBins, (d) => d3.max(d.bins, (d) => d.count)) ?? 10;
-    const color = d3.scaleLinear([0, maxCount], ["white", "orange"]);
+    const color = d3.scaleLinear([0, maxCount], ["transparent", "orange"]);
     container
       .selectAll("g")
-      .data(idAndBins)
+      .data(idAndBins, (d: any) => d.id)
       .join("g")
       .selectAll("rect")
       .data((d) => d.bins)
@@ -171,8 +171,9 @@ export function eventMarker(
       (() => {
         throw new Error("yAxis is null or undefined");
       })();
+    console.time("eventMarker");
     const yScale = yAxis.scale();
-    const ticks = xScale.ticks();
+    const ticks = xScale.ticks(100);
     const numTicks = ticks.map((d) => d.getTime());
     const { 0: start, 1: end } = xScale.domain();
     const xDomain: [number, number] = [start.getTime(), end.getTime()];
@@ -183,13 +184,17 @@ export function eventMarker(
       filteredEvents.length < events.length
         ? d3.group(filteredEvents, (d) => d.id)
         : allEventById;*/
-
+    console.timeLog("eventMarker");
     // 设置只显示指定维度节点,并且重新渲染X坐标轴，只显示对应区间的维度
-    yAxis.withScale((s) =>
-      s.domain([
-        ...new Set(filteredEvents.flatMap((e) => [e.id, ...e.entityIds])),
-      ]),
-    )();
+    /*const entityIds = new Set<string>();
+    console.log("filteredEvents", filteredEvents.length);
+    for (const e of filteredEvents) {
+      entityIds.add(e.id);
+      e.entityIds.forEach((id) => entityIds.add(id));
+    }
+    console.timeLog("eventMarker");
+    yAxis.withScale((s) => s.domain(Array.from(entityIds)))();*/
+    console.timeLog("eventMarker");
     const bisect = d3
       .bin<Event, number>()
       .value((d) => d.time.start)
@@ -210,6 +215,7 @@ export function eventMarker(
         return { id, bins };
       },
     );
+    console.timeEnd("eventMarker");
     // 通过操作阈值的数量
     const thresholdCount = d3.sum(idAndBins, (d) =>
       d3.sum(d.bins, (d) => (d.count > thresholdSize ? 1 : 0)),
@@ -242,7 +248,7 @@ export function eventMarker(
   return render;
 }
 
-function eventNodeTooltip(
+/*function eventNodeTooltip(
   el: d3.Selection<SVGCircleElement, Event, null, undefined>,
   events: Events,
   getNameById: (id: string) => string,
@@ -305,4 +311,4 @@ function eventNodeTooltip(
   el.selectAll<SVGCircleElement, Event>(".nodes circle")
     .on("pointerenter", entered)
     .on("pointerleave", leaved);
-}
+}*/

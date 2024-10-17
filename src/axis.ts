@@ -283,12 +283,12 @@ export function timeXAxis(
 ): XAxis {
   container = container
     .attr("class", "xAxis")
-    .attr("transform", `translate(${padding.left}, ${padding.bottom})`);
+    .attr("transform", `translate(${padding.left}, 20)`);
   const extent = d3.extent(events, (d) => d.time.start);
   let x = d3
     .scaleTime()
     .domain(extent as [number, number])
-    .range([150, width]);
+    .range([120, width]);
   function render() {
     container.call(
       d3

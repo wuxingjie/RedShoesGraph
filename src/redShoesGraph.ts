@@ -2,6 +2,8 @@ import * as d3 from "d3";
 import { hierarchyYAxis, timeXAxis } from "./axis.ts";
 import { eventHeatmapMarker, eventLinksMarker, eventMarker } from "./event.ts";
 import { scrollBar, scrollYMarker } from "./scrollBar.ts";
+import { eventData } from "./data.ts";
+import { measureExecutionTime } from "./utils/functional.ts";
 
 export type Entity = { id: string; name?: string; parentId?: string };
 
@@ -74,8 +76,13 @@ export default function redShoesGraph(
   const eventLinkEl = content.append("g");
   const eventLink = eventLinksMarker(eventLinkEl, color);
   const eventHeatmap = eventHeatmapMarker(heatmapEl);
-  const heatMapOrLink = eventMarker(events, eventLink, eventHeatmap, 2);
-  const xAxis = timeXAxis(xEl, events, width, padding)();
+  const heatMapOrLink = eventMarker(
+    eventData(events),
+    eventLink,
+    eventHeatmap,
+    2,
+  );
+  const xAxis = timeXAxis(xEl, events, width - padding.right, padding)();
   const yAxisScrollBar = scrollBar(contentHeight, contentHeight);
   // 渲染Y轴滚动条
   const yAxisScrollMarker = scrollYMarker(yAxisScrollBar).offset(-10);
@@ -92,13 +99,16 @@ export default function redShoesGraph(
   heatMapOrLink.xScale(xAxis.scale()).yAxis(yAxis)(); // 根据区间渲染事件和Y轴
   yAxisScrollMarker(yEl);
   const originalXScale = xAxis.scale();
-  const globalZoomEvent = d3.zoom<SVGSVGElement, any>().on("zoom", (e) => {
-    // 重新计算比例尺
-    const rx = e.transform.rescaleX(originalXScale);
-    xAxis.setScale(rx)(); // 设置X轴scale
-    // yAxisScrollBar.scrollOffset(0); // 重置滚动条
-    heatMapOrLink.xScale(rx)(); // 重新渲染事件连线或者热力图
-  });
+  const globalZoomEvent = d3.zoom<SVGSVGElement, any>().on(
+    "zoom",
+    measureExecutionTime((e) => {
+      // 重新计算比例尺
+      const rx = e.transform.rescaleX(originalXScale);
+      xAxis.setScale(rx)(); // 设置X轴scale
+      // yAxisScrollBar.scrollOffset(0); // 重置滚动条
+      heatMapOrLink.xScale(rx)(); // 重新渲染事件连线或者热力图
+    }, "zoom"),
+  );
   svg.call(globalZoomEvent).on("dblclick.zoom", null); //  绑定全局 zoom 事件
 
   /*const yAxisScrollEvent = d3
