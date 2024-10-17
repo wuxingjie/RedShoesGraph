@@ -60,7 +60,7 @@ const data: DataConfig = {
 redShoesGraph({
   container: document.querySelector<HTMLDivElement>("#app")!,
   width: window.innerWidth - 20,
-  height: window.innerHeight - 20,
+  height: 200,
   padding: {
     top: 20,
     right: 20,

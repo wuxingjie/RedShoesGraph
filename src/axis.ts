@@ -208,7 +208,7 @@ export function hierarchyYAxis(
       );
     const tickGroup = ticks
       .selectAll("g")
-      .data(yTicks)
+      .data(yTicks, (d: any) => d.data.id)
       .join("g")
       .attr("transform", (d) => `translate(0,${scaleY(d.data.id)})`);
 

@@ -186,14 +186,14 @@ export function eventMarker(
         : allEventById;*/
     console.timeLog("eventMarker");
     // 设置只显示指定维度节点,并且重新渲染X坐标轴，只显示对应区间的维度
-    /*const entityIds = new Set<string>();
+    const entityIds = new Set<string>();
     console.log("filteredEvents", filteredEvents.length);
     for (const e of filteredEvents) {
       entityIds.add(e.id);
       e.entityIds.forEach((id) => entityIds.add(id));
     }
     console.timeLog("eventMarker");
-    yAxis.withScale((s) => s.domain(Array.from(entityIds)))();*/
+    yAxis.withScale((s) => s.domain(Array.from(entityIds)))();
     console.timeLog("eventMarker");
     const bisect = d3
       .bin<Event, number>()
