@@ -1,18 +1,39 @@
-export function measureExecutionTime<T extends (...args: any[]) => any>(
-  targetFunction: T,
-  name?: string,
-): (...args: Parameters<T>) => ReturnType<T> {
-  let totalTime = 0; // 累积的执行时间
-  name = name ?? targetFunction.name;
-  return (...args: Parameters<T>): ReturnType<T> => {
-    const start = performance.now(); // 记录开始时间
-    const result = targetFunction(...args); // 执行目标函数
-    const end = performance.now(); // 记录结束时间
-    const timeTaken = end - start; // 计算此次执行时间
-    totalTime += timeTaken; // 累加时间
-    console.log(
-      `${name}, Execution time: ${timeTaken} ms, Total: ${totalTime}`,
-    ); // 打印执行时间
-    return result; // 返回目标函数的结果
+export function constFunc<T>(a: T): () => T {
+  return () => a;
+}
+
+export function identity<T>(a: T): T {
+  return a;
+}
+
+export interface ChainableFunction<T, R> {
+  (v: T): R;
+
+  andThen<N>(f: (v: R) => N): ChainableFunction<T, N>;
+}
+
+export function chainable<T, R>(func: (v: T) => R): ChainableFunction<T, R> {
+  // @ts-ignore
+  func.andThen = <N>(n: (v: R) => N): ChainableFunction<T, N> => {
+    return chainable((v: T) => n(func(v)));
+  };
+  return func as ChainableFunction<T, R>;
+}
+
+export function compose<T>(...fns: Array<(arg: T) => T>): (arg: T) => T;
+export function compose<T, R>(fn1: (arg: T) => R): (arg: T) => R;
+export function compose<T, R, U>(
+  fn1: (arg: T) => R,
+  fn2: (arg: R) => U,
+): (arg: T) => U;
+export function compose<T, R, U, V>(
+  fn1: (arg: T) => R,
+  fn2: (arg: R) => U,
+  fn3: (arg: U) => V,
+): (arg: T) => V;
+// ...可以继续扩展更多函数参数, 但是一般不用, 比如有四个函数可以两两组合,实际上一般只需要两个函数组合即可
+export function compose<T>(...fns: Function[]): (arg: T) => any {
+  return (arg: T) => {
+    return fns.reduce((acc, fn) => fn(acc), arg);
   };
 }

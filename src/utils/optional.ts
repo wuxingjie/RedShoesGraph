@@ -1,4 +1,4 @@
-import { isFunction } from "./types.ts";
+import { isFunction } from "./typeCheck.ts";
 
 class Optional<T> {
   constructor(public value?: T) {}

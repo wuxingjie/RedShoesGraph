@@ -45,43 +45,61 @@ class Stream<T> implements Iterable<T> {
   }
 
   map<R>(m: (v: T, index: number) => R): Stream<R> {
-    return new Stream(map(m)(this));
+    return Stream.from(map(m)(this));
   }
 
-  flatMap = <R>(m: (v: T) => Iterable<R>): Stream<R> =>
-    new Stream(flatMap(m)(this));
+  flatMap<R>(m: (v: T) => Iterable<R>): Stream<R> {
+    return Stream.from(flatMap(m)(this));
+  }
 
-  scanLeft = <R>(init: R, op: (b: R, e: T) => R): Stream<R> =>
-    new Stream(scanLeft(init, op)(this));
+  scanLeft<R>(init: R, op: (b: R, e: T) => R): Stream<R> {
+    return Stream.from(scanLeft(init, op)(this));
+  }
 
-  filter = (f: (e: T, index: number) => boolean): Stream<T> =>
-    new Stream(filter(f)(this));
+  filter(f: (e: T, index: number) => boolean): Stream<T> {
+    return Stream.from(filter(f)(this));
+  }
 
-  filterNot = (f: (e: T, index: number) => boolean): Stream<T> =>
-    new Stream(filterNot(f)(this));
+  filterNot(f: (e: T, index: number) => boolean): Stream<T> {
+    return new Stream(filterNot(f)(this));
+  }
 
-  filterNotNull = (): Stream<NonNullable<T>> =>
-    new Stream(filterNotNull<T>()(this));
+  filterNotNull(): Stream<NonNullable<T>> {
+    return new Stream(filterNotNull<T>()(this));
+  }
 
-  take = (n: number): Stream<T> => new Stream(take<T>(n)(this));
+  take(n: number): Stream<T> {
+    return new Stream(take<T>(n)(this));
+  }
 
-  takeWhile = (p: (e: T) => boolean): Stream<T> =>
-    new Stream(takeWhile(p)(this));
+  takeWhile(p: (e: T) => boolean): Stream<T> {
+    return new Stream(takeWhile(p)(this));
+  }
 
-  skip = (n: number): Stream<T> => new Stream(skip<T>(n)(this));
+  skip(n: number): Stream<T> {
+    return new Stream(skip<T>(n)(this));
+  }
 
-  skipWhile = (p: (e: T) => boolean): Stream<T> =>
-    new Stream(skipWhile(p)(this));
+  skipWhile(p: (e: T) => boolean): Stream<T> {
+    return new Stream(skipWhile(p)(this));
+  }
 
-  slice = (from: number, until: number): Stream<T> =>
-    new Stream(slice<T>(from, until)(this));
+  slice(from: number, until: number): Stream<T> {
+    return new Stream(slice<T>(from, until)(this));
+  }
 
-  zip = <B>(that: Iterable<B>): Stream<[T, B]> => new Stream(zip(this, that));
+  zip<B>(that: Iterable<B>): Stream<[T, B]> {
+    return new Stream(zip(this, that));
+  }
 
-  zipWithIndex = (): Stream<[T, number]> => new Stream(zipWithIndex<T>()(this));
+  zipWithIndex(): Stream<[T, number]> {
+    return new Stream(zipWithIndex<T>()(this));
+  }
 
   // -------------------------collectors-----------------------
-  toArray = (): T[] => toArray<T>()(this);
+  toArray(): T[] {
+    return toArray<T>()(this);
+  }
 }
 
 export { Stream };

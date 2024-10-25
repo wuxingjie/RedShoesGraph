@@ -1,4 +1,4 @@
-import { isIterable, isNotNull } from "./types";
+import { isIterable, isNotNull } from "./typeCheck";
 
 function map<T, R>(
   m: (v: T, index: number) => R,

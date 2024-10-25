@@ -18,6 +18,10 @@ export function isNumeric(v: any): v is number {
   return !isNaN(v) && !isNaN(parseFloat(v));
 }
 
+export function isString(value: any): value is string {
+  return typeof value === "string";
+}
+
 export function isFunction(v: any): v is Function {
   return typeof v === "function";
 }
