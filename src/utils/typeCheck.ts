@@ -26,6 +26,10 @@ export function isFunction(v: any): v is Function {
   return typeof v === "function";
 }
 
+export function isObject(v: any): v is object {
+  return v != null && typeof v === "object";
+}
+
 export function isIterable<T>(obj: any): obj is Iterable<T> {
   // 如果对象为 null 或 undefined，则返回 false
   if (isNull(obj)) {
