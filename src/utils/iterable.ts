@@ -193,6 +193,38 @@ function forEachIterable<T>(
     index++;
   }
 }
+
+function cycle<T>(...items: T[]): Generator<T> {
+  function* gen() {
+    while (true) {
+      // 无限循环
+      for (const item of items) {
+        yield item;
+      }
+    }
+  }
+  return gen();
+}
+
+function chunkPairs<T>(itr: Iterable<T>, num: number = 2): Iterable<T[]> {
+  function* gen(): Generator<T[]> {
+    let currentPair: T[] = [];
+    for (const item of itr) {
+      currentPair.push(item);
+      if (currentPair.length === num) {
+        yield currentPair;
+        // 为了提高效率,不重新创建数组,直接清空
+        currentPair.length = 0;
+      }
+    }
+    // 剩余未配对的元素
+    /* if (currentPair.filter(isNotNull).length > 0) {
+      yield currentPair;
+    }*/
+  }
+  return gen();
+}
+
 function* emptyIterable<T>(): Iterable<T> {
   // 不产生任何值
 }
@@ -217,5 +249,7 @@ export {
   generate,
   toIterable,
   forEachIterable,
+  cycle,
+  chunkPairs,
   emptyIterable,
 };

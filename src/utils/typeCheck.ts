@@ -30,6 +30,23 @@ export function isObject(v: any): v is object {
   return v != null && typeof v === "object";
 }
 
+const plainObjectString = Object.toString();
+export function isPlainObject(value: any) {
+  if (!isObject(value)) {
+    return false;
+  }
+  const proto = Object.getPrototypeOf(value);
+  if (proto == null) {
+    return true;
+  }
+  const protoConstructor =
+    Object.hasOwnProperty.call(proto, "constructor") && proto.constructor;
+  return (
+    typeof protoConstructor === "function" &&
+    protoConstructor.toString() === plainObjectString
+  );
+}
+
 export function isIterable<T>(obj: any): obj is Iterable<T> {
   // 如果对象为 null 或 undefined，则返回 false
   if (isNull(obj)) {

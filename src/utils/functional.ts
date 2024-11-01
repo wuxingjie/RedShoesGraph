@@ -1,9 +1,26 @@
+export type Runner = () => void;
+
 export function constFunc<T>(a: T): () => T {
   return () => a;
 }
 
 export function identity<T>(a: T): T {
   return a;
+}
+
+export function safe<T>(fn: () => T): () => T {
+  return () => {
+    return safeRun(fn);
+  };
+}
+
+export function safeRun<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    console.error(e);
+    return undefined as any;
+  }
 }
 
 export interface ChainableFunction<T, R> {

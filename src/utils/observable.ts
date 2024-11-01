@@ -1,5 +1,6 @@
-import { isObject } from "./typeCheck.ts";
+import { isPlainObject } from "./typeCheck.ts";
 import { computeIfAbsent } from "./map.ts";
+import { Runner, safe } from "./functional.ts";
 
 type Observer = (
   property: string,
@@ -7,6 +8,8 @@ type Observer = (
   value: any,
   oldValue: any,
 ) => void;
+
+export type Cancel = Runner;
 
 class Observable<T extends object> {
   private readonly _value: T;
@@ -26,7 +29,7 @@ class Observable<T extends object> {
       ?.forEach((observer) => observer(property, target, value, oldValue));
   }
 
-  public observe(property: string, observer: Observer) {
+  public observe(property: string, observer: Observer): Cancel {
     const propObservers = computeIfAbsent(
       this._observers,
       property,
@@ -35,6 +38,9 @@ class Observable<T extends object> {
     propObservers.add(observer);
     return () => {
       propObservers.delete(observer);
+      if (propObservers.size === 0) {
+        this._observers.delete(property);
+      }
     };
   }
 
@@ -47,14 +53,19 @@ class Observable<T extends object> {
         return true;
       },
       get: (target: any, property: string): any => {
-        if (isObject(target[property])) {
-          const obj: any = new Observable(target[property]).value;
-          return obj[property];
+        const propValue = target[property];
+
+        if (!(propValue instanceof Observable) && isPlainObject(propValue)) {
+          const observable = new Observable(propValue);
+          target[property] = observable.value; // 替换为 observable 的值
+          return observable.value;
         }
+
         if (currentComputed) {
-          currentComputed.addDependency(property, this); // 收集依赖
+          currentComputed.observe(property, this);
         }
-        return target[property];
+
+        return propValue;
       },
     };
     return new Proxy(obj, handler);
@@ -67,60 +78,73 @@ class Computed<T> {
   private readonly computeFn: () => T;
   private _value: T | undefined;
   private _isDirty: boolean;
+  private _observed: boolean;
+  private cancelObserve: Cancel[] = [];
+  private subComputed?: Computed<unknown>[];
 
   constructor(computeFn: () => T) {
-    this.computeFn = computeFn;
+    this.computeFn = safe(computeFn); // 不抛异常
     this._value = undefined;
     this._isDirty = true;
+    this._observed = false;
   }
 
-  addDependency(property: string, dep: Observable<any>) {
-    dep.observe(property, () => (this._isDirty = true));
+  observe(property: string, dep: Observable<any>) {
+    if (!this._observed) {
+      const cancel = dep.observe(property, () => (this.isDirty = true));
+      this.cancelObserve.push(cancel);
+    }
+  }
+
+  addSubComputed(dep: Computed<any>) {
+    const subComputed = this.subComputed ?? (this.subComputed = []);
+    subComputed.push(dep);
+  }
+
+  set isDirty(value: boolean) {
+    this._isDirty = value;
+    this.subComputed?.forEach((dep) => (dep.isDirty = true));
   }
 
   get value(): T {
-    if (this._isDirty) {
+    const tempComputed = currentComputed;
+    // 计算属性依赖
+    if (currentComputed) {
+      this.addSubComputed(currentComputed);
+    }
+    if (!this._observed) {
       currentComputed = this; // 设置当前计算属性
+    }
+    // 脏了,重新计算
+    if (this._isDirty) {
       this._value = this.computeFn(); // 计算值，自动收集依赖
-      currentComputed = null; // 清除当前计算属性
       this._isDirty = false; // 清除脏标记
     }
+    this._observed = true;
+    // 还原
+    currentComputed = tempComputed;
     return this._value!;
   }
+
+  destroy() {
+    this.cancelObserve.forEach((cancel) => cancel());
+    // @ts-ignore
+    this._value = null;
+    // @ts-ignore
+    this.cancelObserve = null;
+    // @ts-ignore
+    this.dependencies = null;
+  }
 }
-
-// 示例使用
-interface Person {
-  name: string;
-  age: number;
-}
-
-const person = new Observable<Person>({
-  name: "Alice",
-  age: 30,
-});
-
-// 创建一个计算属性，直接通过计算函数捕获特定属性
-const computedDescription = new Computed(() => {
-  return `${person.value.name} is ${person.value.age} years old.`;
-});
-
-// 使用计算属性
-console.log(computedDescription.value); // 输出: Alice is 30 years old.
-
-// 观察计算属性的变化
-person.observe(() => {
-  console.log(`Description changed: ${computedDescription.value}`);
-});
-
-// 修改值
-person.value.name = "Bob"; // 输出: Description changed: Bob is 30 years old.
-person.value.age = 31; // 输出: Description changed: Bob is 31 years old.
 
 export function observable<T extends object>(source: T): T {
-  if (isObject(source)) {
+  if (isPlainObject(source)) {
     return new Observable(source).value;
   } else {
-    throw new Error("source type is not object/");
+    throw new Error("source type is not PlainObject");
   }
+}
+
+export function computed<T>(fn: () => T): Computed<T> {
+  return new Computed(fn);
 }

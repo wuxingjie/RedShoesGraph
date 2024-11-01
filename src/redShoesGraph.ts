@@ -3,7 +3,7 @@ import { hierarchyYAxis, timeXAxis } from "./axis.ts";
 import { eventHeatmapMarker, eventLinksMarker, eventMarker } from "./event.ts";
 import { scrollBar, scrollYMarker } from "./scrollBar.ts";
 import { eventData } from "./data.ts";
-import { measureExecutionTime } from "./utils/functional.ts";
+import { measureExecutionTime } from "./utils/performance.ts";
 
 export type Entity = { id: string; name?: string; parentId?: string };
 

@@ -2,6 +2,9 @@ import { Container } from "./container.ts";
 import { XY } from "../commonTypes.ts";
 import { Layer } from "./layer.ts";
 import { Stage } from "./stage.ts";
+import { computed, observable } from "../utils/observable.ts";
+import { Transformer } from "./Transformer.ts";
+import { degreesToArc } from "./utils.ts";
 
 export interface NodeOptions<Datum = unknown> {
   id?: string;
@@ -17,9 +20,9 @@ export interface NodeOptions<Datum = unknown> {
   opacity?: number;
   scale?: XY;
   scaleX?: number;
+  scaleY?: number;
   skewX?: number;
   skewY?: number;
-  scaleY?: number;
   rotation?: number;
   rotationDeg?: number;
   offset?: XY;
@@ -43,32 +46,61 @@ export abstract class Node<Options extends NodeOptions = NodeOptions>
   implements NodeOptionsGetterSetter
 {
   parent?: Container;
-  protected options: Options;
+  private readonly _options: Options;
+  private readonly _transform = computed(() => {
+    const trans = new Transformer();
+    const transX = (this.x() ?? 0) + (this._options.offsetX ?? 0),
+      transY = (this.y() ?? 0) + (this._options.offsetY ?? 0),
+      scaleX = this._options.scaleX ?? this._options.scale?.x ?? 1,
+      scaleY = this._options.scaleY ?? this._options.scale?.y ?? 1,
+      rotation =
+        this._options.rotation ??
+        (this._options.rotationDeg !== undefined
+          ? degreesToArc(this._options.rotationDeg!)
+          : 0),
+      skewX = this._options.skewX ?? 0,
+      skewY = this._options.skewY ?? 0;
+    if (transX !== 0) {
+      trans.translateX(transX);
+    }
+    if (transY !== 0) {
+      trans.translateY(transY);
+    }
+    if (scaleX !== 1 || scaleY !== 1) {
+      trans.scale(scaleX, scaleY);
+    }
+    if (rotation !== 0) {
+      trans.rotate(rotation);
+    }
+    if (skewX !== 0 || skewY !== 0) {
+      trans.skew(skewX, skewY);
+    }
+    return trans;
+  });
+  private readonly _absoluteTransform = computed(() => {
+    const transform = this.getTransform();
+    return this.parent?.getTransform()?.copy().multiply(transform) ?? transform;
+  });
 
   protected constructor(opts?: Options) {
-    this.options = opts ?? ({} as Options);
+    const options = opts ?? ({} as Options);
+    this._options = observable(options);
   }
 
   getOption<T extends keyof Options>(name: T): Options[T] | undefined {
-    return this.options[name];
+    return this._options[name];
   }
 
   setOption<T extends keyof Options>(name: T, value: Options[T]): this {
-    this.options[name] = value;
+    this._options[name] = value;
     this.requestDraw();
     return this;
   }
 
   setOptions(options: Partial<Options>): this {
-    Object.assign(this.options, options);
+    Object.assign(this._options, options);
     this.requestDraw();
     return this;
-  }
-
-  private requestDraw() {
-    if (this.autoDraw()) {
-      this.getLayer()?.batchDraw();
-    }
   }
 
   getLayer(): Layer | undefined {
@@ -84,7 +116,38 @@ export abstract class Node<Options extends NodeOptions = NodeOptions>
     this.setOption("height", height);
   }
 
+  private requestDraw() {
+    if (this.autoDraw()) {
+      this.getLayer()?.batchDraw();
+    }
+  }
+
   abstract draw(): this;
+
+  getAbsoluteTransform(): Transformer {
+    return this._absoluteTransform.value;
+  }
+
+  getTransform(): Transformer {
+    return this._transform.value;
+  }
+
+  ancestors(includeSelf: boolean = false): Iterable<Node> {
+    const self = this;
+    function* gen() {
+      if (includeSelf) {
+        yield self;
+      }
+      yield* self.parent?.ancestors(true) ?? [];
+    }
+    return gen();
+  }
+
+  remove() {
+    this.parent?.removeChildren(this);
+    this._transform.destroy();
+    this._absoluteTransform.destroy();
+  }
 
   // -------------------------- getter setter -----------------------------
   id(): NodeOptions["id"];

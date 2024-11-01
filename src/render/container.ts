@@ -31,7 +31,7 @@ export class Container<
     });
   }
 
-  remove(els: ItemType | Iterable<ItemType>) {
+  removeChildren(els: ItemType | Iterable<ItemType>) {
     const children = this._children;
     if (children == null) {
       return;
@@ -44,7 +44,7 @@ export class Container<
   }
 
   removeAllChildren() {
-    this.remove(this.children);
+    this.removeChildren(this.children);
   }
 
   sortChildren(compareFn?: (a: ItemType, b: ItemType) => number): void {

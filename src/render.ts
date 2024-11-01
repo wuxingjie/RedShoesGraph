@@ -1,12 +1,14 @@
 import { Stage } from "./render/stage.ts";
 import { Layer } from "./render/layer.ts";
-import { Rect } from "./render/shape/rect.ts";
+import { Text } from "./render/shape/text.ts";
 import * as d3 from "d3";
+import { Line } from "./render/shape/line.ts";
+import { Shape } from "./render/shape/shape.ts";
 
 const width = window.innerWidth;
 const height = window.innerHeight;
-const rectHCount = 100;
-const rectVCount = 100;
+const rectHCount = 50;
+const rectVCount = 50;
 const rectWidth = width / rectHCount;
 const rectHeight = height / rectVCount;
 const stage = new Stage({
@@ -15,28 +17,61 @@ const stage = new Stage({
   height: height,
 });
 
-const layer = new Layer();
+const layer = new Layer({ x: 0, y: 0 });
 
 stage.add(layer);
 
 const color = d3.scaleSequential([0, 100], d3.schemeCategory10);
-let frameCount = 0; // 帧计数
-let lastTime = 0; // 上一次更新的时间
-let fps = 0; // 帧率
 
 for (let i = 0; i < rectVCount; i++) {
   for (let j = 0; j < rectHCount; j++) {
     layer.add(
-      new Rect({
+      new Line({
+        //text: `hello${i + j}`,
+        points: [0, 0, rectWidth, 0],
         x: j * rectWidth,
         y: i * rectHeight,
-        fillStyle: color(Math.random() * 100),
+        rotationDeg: 10,
+        strokeStyle: color(Math.random() * 100),
         width: rectWidth,
         height: rectHeight,
       }),
     );
   }
 }
+// 单个shape测试
+/*layer.add(
+  new Line({
+    //text: `hello${i + j}`,
+    points: [0, 0, rectWidth, 0],
+    x: 0,
+    y: 0,
+    rotationDeg: 10,
+    strokeStyle: color(Math.random() * 100),
+    width: rectWidth,
+    height: rectHeight,
+  }),
+);*/
+
+// FPS
+const fpsText = new Text({
+  text: `FPS FPS`,
+  x: 0,
+  y: 50,
+  //strokeStyle: "red",
+  fillStyle: "black",
+  lineWidth: 2,
+  fontSize: 50,
+  textBaseline: "bottom",
+  textDecoration: "line-through",
+  textAlign: "center",
+});
+layer.add(fpsText);
+
+let frameCount = 0; // 帧计数
+let lastTime = 0; // 上一次更新的时间
+let fps = 0; // 帧率
+
 function render(currentTime: number) {
   frameCount++; // 增加帧计数
 
@@ -48,17 +83,20 @@ function render(currentTime: number) {
     fps = frameCount; // 更新帧率
     frameCount = 0; // 重置帧计数
     lastTime = currentTime; // 更新最后的时间
-    console.log(`FPS: ${fps}`); // 在控制台输出帧率
+    fpsText.text(`FPS: ${fps}`);
   }
 
+  //layer.x(layer.x()! + 2);
   for (const el of layer.children) {
-    const rect = el as Rect;
-    rect.fillStyle(color(Math.random() * 100)).x(rect.x()! + 1);
+    const rect = el as Shape;
+    rect.strokeStyle(color(Math.random() * 100));
+    //.x(rect.x()! + 2);
   }
 
   layer.batchDraw();
 
-  requestAnimationFrame(render);
+  //setTimeout(() => render(performance.now()), 3000);
+  //requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
 

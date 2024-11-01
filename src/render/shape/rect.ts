@@ -10,8 +10,9 @@ export class Rect extends Shape {
     super(options);
   }
 
-  override applyPath(context: Context2D): void | Path2D {
-    context.rect(this.x()!, this.y()!, this.width()!, this.height()!);
-    return undefined;
+  override applyContext(context: Context2D): void | Path2D {
+    context.apply((ctx) => {
+      ctx.rect(this.x()!, this.y()!, this.width()!, this.height()!);
+    });
   }
 }

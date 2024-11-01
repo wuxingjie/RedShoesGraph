@@ -1,7 +1,7 @@
 import { Group } from "./group.ts";
 import { Shape } from "./shape/shape.ts";
 import { Container, ContainerOptions } from "./container.ts";
-import { Canvas } from "./canvas.ts";
+import { Canvas, Context2D } from "./canvas.ts";
 
 export interface LayerOptions extends ContainerOptions {
   clearBeforeDraw?: boolean;
@@ -32,7 +32,7 @@ export class Layer extends Container<LayerOptions, Group | Shape> {
       this._waitingForDraw = true;
       requestAnimationFrame(() => {
         if (this.clearBeforeDraw()) {
-          this.canvas.ctx.clearRect();
+          this.canvas.ctx.apply(Context2D.clearRect());
         }
         this.draw();
         this._waitingForDraw = false;

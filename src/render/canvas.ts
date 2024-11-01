@@ -1,5 +1,5 @@
-import { Shape } from "./shape/shape.ts";
 import { Rect } from "../commonTypes.ts";
+import { Shape } from "./shape/shape.ts";
 
 export class Canvas {
   private readonly _canvasEl: HTMLCanvasElement;
@@ -27,90 +27,75 @@ export class Canvas {
   }
 }
 
+export type NativeContext2DCallback<T> = (
+  nativeCtx: CanvasRenderingContext2D,
+) => void | T;
+
 export class Context2D {
   constructor(private ctx: CanvasRenderingContext2D) {}
 
-  clearRect(rect?: Rect): Context2D {
-    if (rect) {
-      const { x, y, width, height } = rect;
-      this.ctx.clearRect(x, y, width, height);
+  static clearRect(rect?: Rect): NativeContext2DCallback<void> {
+    return (ctx) => {
+      if (rect) {
+        const { x, y, width, height } = rect;
+        ctx.clearRect(x, y, width, height);
+      } else {
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      }
+    };
+  }
+
+  static statesIsolation(
+    fn: NativeContext2DCallback<void>,
+  ): NativeContext2DCallback<void> {
+    return (ctx) => {
+      ctx.save();
+      fn(ctx);
+      ctx.restore();
+    };
+  }
+
+  static path(
+    fn: NativeContext2DCallback<void>,
+    closePath: boolean = false,
+  ): NativeContext2DCallback<void> {
+    return (ctx) => {
+      ctx.beginPath();
+      fn(ctx);
+      if (closePath) {
+        ctx.closePath();
+      }
+    };
+  }
+
+  static applyShape(shape: Shape): NativeContext2DCallback<void> {
+    return (ctx) => {
+      const fillStyle = shape.fillStyle(),
+        strokeStyle = shape.strokeStyle(),
+        lineWidth = shape.lineWidth();
+      if (fillStyle) ctx.fillStyle = fillStyle;
+      if (strokeStyle) ctx.strokeStyle = strokeStyle;
+      if (lineWidth) ctx.lineWidth = lineWidth;
+      const matrixValues = shape.getAbsoluteTransform().getMatrixValues();
+      ctx.setTransform(
+        matrixValues[0],
+        matrixValues[1],
+        matrixValues[2],
+        matrixValues[3],
+        matrixValues[4],
+        matrixValues[5],
+      );
+    };
+  }
+
+  apply<T>(fn: NativeContext2DCallback<void>): this;
+  apply<T>(fn: NativeContext2DCallback<T>): T;
+  apply<T>(fn: NativeContext2DCallback<T>): this | T {
+    const res = fn(this.ctx);
+    if (res) {
+      return res;
     } else {
-      this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+      return this;
     }
-    return this;
-  }
-
-  rect(x: number, y: number, width: number, height: number): Context2D {
-    this.ctx.rect(x, y, width, height);
-    return this;
-  }
-
-  moveTo(x: number, y: number): Context2D {
-    this.ctx.moveTo(x, y);
-    return this;
-  }
-
-  lineTo(x: number, y: number): Context2D {
-    this.ctx.lineTo(x, y);
-    return this;
-  }
-
-  arcTo(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    radius: number,
-  ): Context2D {
-    this.ctx.arcTo(x1, y1, x2, y2, radius);
-    return this;
-  }
-
-  translate(x: number, y: number): Context2D {
-    this.ctx.translate(x, y);
-    return this;
-  }
-
-  save(): Context2D {
-    this.ctx.save();
-    return this;
-  }
-
-  restore(): Context2D {
-    this.ctx.restore();
-    return this;
-  }
-
-  beginPath(): Context2D {
-    this.ctx.beginPath();
-    return this;
-  }
-
-  closePath(): Context2D {
-    this.ctx.closePath();
-    return this;
-  }
-
-  fillStrokeShape(shape: Shape) {
-    this.ctx.save();
-    this.ctx.beginPath();
-    if (shape.fillStyle()) {
-      this.ctx.fillStyle = shape.fillStyle()!;
-      const path = shape.applyPath(this);
-      if (path) {
-        this.ctx.fill(path);
-      }
-      this.ctx.fill();
-    }
-    if (shape.strokeStyle()) {
-      this.ctx.strokeStyle = shape.strokeStyle()!;
-      const path = shape.applyPath(this);
-      if (path) {
-        this.ctx.stroke(path);
-      }
-      this.ctx.stroke();
-    }
-
-    this.ctx.restore();
   }
 }

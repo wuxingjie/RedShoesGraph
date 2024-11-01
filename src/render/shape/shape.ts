@@ -21,13 +21,57 @@ export abstract class Shape<
   override draw(): this {
     const ctx = this.getLayer()?.canvas.ctx;
     if (ctx) {
-      ctx.fillStrokeShape(this);
+      ctx
+        .apply((nativeCtx) => {
+          nativeCtx.save();
+          nativeCtx.beginPath();
+        })
+        .apply(Context2D.applyShape(this))
+        .apply(() => {
+          const path = this.applyContext(ctx);
+          if (this.hasFill()) {
+            this.doFill(ctx, path || undefined);
+          }
+          if (this.hasStroke()) {
+            this.doStoke(ctx, path || undefined);
+          }
+        })
+        .apply((nativeCtx) => nativeCtx.restore());
     }
     return this;
   }
 
-  abstract applyPath(context: Context2D): void | Path2D;
+  abstract applyContext(context: Context2D): void | Path2D;
 
+  protected doFill(context: Context2D, path?: Path2D): void | Path2D {
+    context.apply((ctx) => {
+      if (path) {
+        ctx.fill(path);
+      } else {
+        ctx.fill();
+      }
+    });
+  }
+
+  protected doStoke(context: Context2D, path?: Path2D): void | Path2D {
+    context.apply((ctx) => {
+      if (path) {
+        ctx.stroke(path);
+      } else {
+        ctx.stroke();
+      }
+    });
+  }
+
+  hasFill(): boolean {
+    return this.fillStyle() !== undefined;
+  }
+
+  hasStroke(): boolean {
+    return this.strokeStyle() !== undefined;
+  }
+
+  // --------------getter setter--------------
   zIndex(): ShapeOptions["zIndex"];
   zIndex(key: ShapeOptions["zIndex"]): this;
   zIndex(key?: ShapeOptions["zIndex"]): ShapeOptions["zIndex"] | this {
