@@ -1,5 +1,5 @@
 import { Shape, ShapeOptions } from "./shape.ts";
-import { Context2D } from "../canvas.ts";
+import { Canvas, Context2D } from "../canvas.ts";
 import { computed } from "../../utils/observable.ts";
 
 const defaultFontSize = 12;
@@ -46,59 +46,61 @@ export class Text extends Shape<TextOptions> {
     super(options);
   }
 
+  private applyTextStyle(ctx: CanvasRenderingContext2D) {
+    ctx.font = this._font.value;
+
+    const direction = this.getOption("direction");
+    if (direction) {
+      ctx.direction = direction;
+    }
+
+    const fontKerning = this.getOption("fontKerning");
+    if (fontKerning) {
+      ctx.fontKerning = fontKerning;
+    }
+
+    const fontStretch = this.getOption("fontStretch");
+    if (fontStretch) {
+      ctx.fontStretch = fontStretch;
+    }
+
+    const fontVariantCaps = this.getOption("fontVariantCaps");
+    if (fontVariantCaps) {
+      ctx.fontVariantCaps = fontVariantCaps;
+    }
+
+    const letterSpacing = this.getOption("letterSpacing");
+    if (letterSpacing) {
+      ctx.letterSpacing = letterSpacing;
+    }
+
+    const textAlign = this.getOption("textAlign");
+    if (textAlign) {
+      ctx.textAlign = textAlign;
+    }
+
+    const textBaseline = this.getOption("textBaseline");
+    if (textBaseline) {
+      ctx.textBaseline = textBaseline;
+    }
+
+    const textRendering = this.getOption("textRendering");
+    if (textRendering) {
+      ctx.textRendering = textRendering;
+    }
+
+    const wordSpacing = this.getOption("wordSpacing");
+    if (wordSpacing) {
+      ctx.wordSpacing = wordSpacing;
+    }
+  }
+
   override applyContext(context: Context2D): void | Path2D {
-    context.apply((ctx) => {
+    context.apply(this.applyTextStyle).apply((ctx) => {
       const x = this.x() ?? 0,
         y = this.y() ?? 0,
         width = this.width(),
         height = this.height();
-
-      ctx.font = this._font.value;
-
-      const direction = this.getOption("direction");
-      if (direction) {
-        ctx.direction = direction;
-      }
-
-      const fontKerning = this.getOption("fontKerning");
-      if (fontKerning) {
-        ctx.fontKerning = fontKerning;
-      }
-
-      const fontStretch = this.getOption("fontStretch");
-      if (fontStretch) {
-        ctx.fontStretch = fontStretch;
-      }
-
-      const fontVariantCaps = this.getOption("fontVariantCaps");
-      if (fontVariantCaps) {
-        ctx.fontVariantCaps = fontVariantCaps;
-      }
-
-      const letterSpacing = this.getOption("letterSpacing");
-      if (letterSpacing) {
-        ctx.letterSpacing = letterSpacing;
-      }
-
-      const textAlign = this.getOption("textAlign");
-      if (textAlign) {
-        ctx.textAlign = textAlign;
-      }
-
-      const textBaseline = this.getOption("textBaseline");
-      if (textBaseline) {
-        ctx.textBaseline = textBaseline;
-      }
-
-      const textRendering = this.getOption("textRendering");
-      if (textRendering) {
-        ctx.textRendering = textRendering;
-      }
-
-      const wordSpacing = this.getOption("wordSpacing");
-      if (wordSpacing) {
-        ctx.wordSpacing = wordSpacing;
-      }
 
       // 绘制文本装饰, 下划线之类的
       const textDecoration = this.getOption("textDecoration");
@@ -121,11 +123,11 @@ export class Text extends Shape<TextOptions> {
           textDecoration === "underline"
             ? y + textMetrics.actualBoundingBoxDescent
             : textDecoration === "line-through"
-              ? y -
-                textMetrics.actualBoundingBoxAscent +
-                (textMetrics.actualBoundingBoxAscent +
-                  textMetrics.actualBoundingBoxDescent) /
-                  2
+              ? (y -
+                  textMetrics.actualBoundingBoxAscent +
+                  (textMetrics.actualBoundingBoxAscent +
+                    textMetrics.actualBoundingBoxDescent)) >>
+                1
               : textDecoration === "overline"
                 ? y - textMetrics.actualBoundingBoxAscent
                 : y;
@@ -140,20 +142,78 @@ export class Text extends Shape<TextOptions> {
         start：文本的起始点在指定的 x 坐标上，具体行为依赖于文本的方向（如从左到右或从右到左）。
         end：文本的结束点在指定的 x 坐标上，同样依赖于文本的方向。
        */
-      const actualWidth = width ?? textWidth;
+      const textAlign = this.getOption("textAlign");
       if (textAlign) {
-        if (textAlign === "center") {
-          ctx.translate(actualWidth / 2, 0);
-        } else if (textAlign === "right") {
-          ctx.translate(actualWidth, 0);
-        } else if (textAlign === "left") {
-          ctx.translate(0, 0);
-        } else if (textAlign === "end") {
-          ctx.translate(actualWidth, 0);
-        } else if (textAlign === "start") {
-          ctx.translate(0, 0);
+        const actualWidth = width ?? textWidth;
+        switch (textAlign) {
+          case "center":
+            ctx.translate(actualWidth >> 1, 0);
+            break;
+          case "right":
+          case "end":
+            ctx.translate(actualWidth, 0);
+            break;
+          case "left":
+          case "start":
+          default:
+            ctx.translate(0, 0);
+            break;
         }
       }
+      const verticalAlign = this.getOption("verticalAlign");
+      if (verticalAlign && height) {
+        switch (verticalAlign) {
+          case "middle": {
+            ctx.translate(0, height >> 1);
+            break;
+          }
+          case "bottom": {
+            ctx.translate(0, height);
+            break;
+          }
+          case "top":
+          default: {
+            ctx.translate(0, 0);
+          }
+        }
+      }
+
+      const wrap = this.getOption("wrap");
+      const texts: string[] = [];
+      if (wrap && width) {
+        const getTextWidth = (text: string) => {
+          return context.apply<TextMetrics>(Context2D.measureText(text)).width;
+        };
+        const maxWidth = width;
+        const lines = this.text()!.split("\n");
+        for (const line of lines) {
+          const lineWidth = getTextWidth(line);
+          if (lineWidth > maxWidth) {
+            let low = 0,
+              high = line.length,
+              match = "",
+              matchWidth = 0;
+            while (low < high) {
+              const mid = (low + high) >> 1;
+              const subStr = line.slice(0, mid);
+              const subStrWidth = getTextWidth(subStr);
+              if (subStrWidth <= maxWidth) {
+                low = mid + 1;
+                match = subStr;
+                matchWidth = subStrWidth;
+              } else {
+                high = mid;
+              }
+            }
+            if (match) {
+              texts.push(match);
+            }
+          }
+        }
+      } else {
+      }
+
+      // render
     });
   }
 

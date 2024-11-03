@@ -88,14 +88,15 @@ export class Context2D {
     };
   }
 
-  apply<T>(fn: NativeContext2DCallback<void>): this;
+  static measureText(str: string): NativeContext2DCallback<TextMetrics> {
+    return (ctx) => ctx.measureText(str);
+  }
+
+  apply(fn: (nativeCtx: CanvasRenderingContext2D) => void): this;
   apply<T>(fn: NativeContext2DCallback<T>): T;
   apply<T>(fn: NativeContext2DCallback<T>): this | T {
-    const res = fn(this.ctx);
-    if (res) {
-      return res;
-    } else {
-      return this;
-    }
+    // 因为效率原因直接返回,不做void判断
+    // @ts-ignore
+    return fn(this.ctx);
   }
 }

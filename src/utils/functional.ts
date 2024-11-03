@@ -23,6 +23,16 @@ export function safeRun<T>(fn: () => T): T {
   }
 }
 
+export function memorize<T>(fn: () => T): () => T {
+  let v: T;
+  return () => {
+    if (v === undefined) {
+      v = fn();
+    }
+    return v;
+  };
+}
+
 export interface ChainableFunction<T, R> {
   (v: T): R;
 
