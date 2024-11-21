@@ -117,7 +117,10 @@ export function eventHeatmapMarker(
     const color = d3.scaleLinear([0, maxCount], ["transparent", "orange"]);
     container
       .selectAll("g")
-      .data(idAndBins, (d: any) => d.id)
+      .data(idAndBins, function (d: any, i, data) {
+        console.log(this);
+        return d.id;
+      })
       .join("g")
       .selectAll("rect")
       .data((d) => d.bins)

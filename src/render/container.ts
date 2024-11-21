@@ -4,7 +4,7 @@ import {
   forEachIterable,
   toIterable,
 } from "../utils/iterable.ts";
-import { isInstanceOf, isInstanceOfType } from "../utils/typeCheck.ts";
+import { isInstanceOf } from "../utils/typeCheck.ts";
 
 export interface ContainerOptions extends NodeOptions {
   clipX?: number;
@@ -19,8 +19,8 @@ export class Container<
 > extends Node<Options> {
   private _children?: Set<ItemType>;
 
-  constructor() {
-    super();
+  constructor(options: Options) {
+    super(options);
   }
 
   hasChildren() {

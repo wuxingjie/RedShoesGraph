@@ -6,11 +6,11 @@ import { computed, observable } from "../utils/observable.ts";
 import { Transformer } from "./transformer.ts";
 import { degreesToArc } from "./utils.ts";
 
-export interface NodeOptions<Datum = unknown> {
+export interface NodeOptions {
   id?: string;
   name?: string;
   tag?: string;
-  datum?: Datum;
+  datum?: any;
   x?: number;
   y?: number;
   width?: number;
