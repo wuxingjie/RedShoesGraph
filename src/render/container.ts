@@ -4,6 +4,7 @@ import {
   forEachIterable,
   toIterable,
 } from "../utils/iterable.ts";
+import { isInstanceOf, isInstanceOfType } from "../utils/typeCheck.ts";
 
 export interface ContainerOptions extends NodeOptions {
   clipX?: number;
@@ -17,6 +18,10 @@ export class Container<
   ItemType extends Node = Node,
 > extends Node<Options> {
   private _children?: Set<ItemType>;
+
+  constructor() {
+    super();
+  }
 
   hasChildren() {
     return this._children != null && this._children.size > 0;
@@ -60,6 +65,17 @@ export class Container<
 
   get children(): Iterable<ItemType> {
     return this._children ?? emptyIterable();
+  }
+
+  each(fn: (item: Node) => void, includeSelf: boolean = false): void {
+    if (includeSelf) {
+      fn(this);
+    }
+    for (const child of this.children) {
+      if (isInstanceOf(child, Container)) {
+        child.each(fn, true);
+      }
+    }
   }
 
   override draw(): this {

@@ -55,3 +55,23 @@ export function isIterable<T>(obj: any): obj is Iterable<T> {
   // 检查对象是否具有 Symbol.iterator 属性
   return typeof obj[Symbol.iterator] === "function";
 }
+
+export function isInstanceOf<T>(
+  obj: any,
+  clazz: new (...args: any[]) => T,
+): obj is T {
+  return obj instanceof clazz;
+}
+
+export function isInstanceOfType<T>(
+  clazz: new (...args: any[]) => T,
+): (obj: any) => obj is T {
+  return (obj: any): obj is T => obj instanceof clazz;
+}
+
+export function isArrayOfType<T>(
+  arr: any[],
+  typeCheck: (item: any) => item is T,
+): arr is T[] {
+  return arr.every(typeCheck);
+}

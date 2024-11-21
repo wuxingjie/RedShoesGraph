@@ -4,6 +4,7 @@ import { Text } from "./render/shape/text.ts";
 import * as d3 from "d3";
 import { Line } from "./render/shape/line.ts";
 import { Shape } from "./render/shape/shape.ts";
+import { Rect } from "./render/shape/rect.ts";
 
 const width = window.innerWidth;
 const height = window.innerHeight;
@@ -55,17 +56,30 @@ for (let i = 0; i < rectVCount; i++) {
 
 // FPS
 const fpsText = new Text({
-  text: `FPS FPS`,
+  text: `CfH BgR slg adf`,
+  direction: "ltr",
   x: 0,
   y: 50,
+  width: 110,
+  height: 220,
   //strokeStyle: "red",
   fillStyle: "black",
   lineWidth: 2,
   fontSize: 50,
-  textBaseline: "bottom",
-  textDecoration: "line-through",
-  textAlign: "center",
+  textBaseline: "top",
+  // /textDecoration: "line-through",
+  textAlign: "start",
+  wrap: "break-word",
 });
+const fpsBackground = new Rect({
+  x: 0,
+  y: 50,
+  width: 100,
+  height: 200,
+  //strokeStyle: "red",
+  fillStyle: "black",
+});
+layer.add(fpsBackground);
 layer.add(fpsText);
 
 let frameCount = 0; // 帧计数
@@ -83,7 +97,8 @@ function render(currentTime: number) {
     fps = frameCount; // 更新帧率
     frameCount = 0; // 重置帧计数
     lastTime = currentTime; // 更新最后的时间
-    fpsText.text(`FPS: ${fps}`);
+    console.log(`FPS: ${fps}`);
+    //fpsText.text(`FPS: ${fps}`);
   }
 
   //layer.x(layer.x()! + 2);
@@ -99,8 +114,43 @@ function render(currentTime: number) {
   //requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
+// 生成一个只包含星期一的时间间隔对象
+const mondays = d3.timeDay.filter((d) => d.getDay() === 1);
+// 从指定范围生成日期序列，每个日期为星期一
+const dateRange = mondays.range(new Date(2024, 0, 1), new Date(2024, 1, 1));
+console.log(dateRange);
 
-/*import * as d3 from "d3";
+const linear = d3.scaleLinear([54, 217], [50, 800]);
+const r = linear.invert(102);
+const ticks = linear.ticks(9);
+console.log(ticks);
+console.log(r);
+
+const time = d3.scaleTime(
+  [new Date(2022, 1, 1), new Date(2022, 2, 1)],
+  ["red", "yellow"],
+);
+console.log(time.ticks(10));
+const p = time(new Date(2022, 2, 1));
+console.log(p);
+
+const x = d3.scalePow([0, 100], [0, 100]).exponent(2);
+x(10);
+
+const axis = d3.axisBottom(linear).ticks(9).tickSizeOuter(0);
+
+d3.select<SVGGElement, undefined>("#axis").call(axis);
+
+/*const my = linearScale([50, 100], [100, 200]);
+const dj = my.map(102);
+console.log(dj);*/
+
+const color1 = d3.scaleSequential([0, 100], d3.interpolateBlues);
+color1(50);
+d3.utcMonday.ceil(new Date());
+d3.format(".2f")(-1.2434);
+d3.timeFormat("%A %B %-d, %Y")(new Date());
+/*
 const canvasEl: HTMLCanvasElement = document.getElementById(
   "canvas",
 ) as HTMLCanvasElement;

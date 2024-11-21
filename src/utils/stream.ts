@@ -1,4 +1,5 @@
 import {
+  chunkPairs,
   filter,
   filterNot,
   filterNotNull,
@@ -29,15 +30,15 @@ class Stream<T> implements Iterable<T> {
   }
 
   static generate<T>(supplier: () => T): Stream<T> {
-    return Stream.from(generate(supplier));
+    return new Stream(generate(supplier));
   }
 
   static iterate<T>(seed: T, p: () => boolean, next: (v: T) => T): Stream<T> {
-    return Stream.from(iterate(seed, p, next));
+    return new Stream(iterate(seed, p, next));
   }
 
   static zip<A, B>(a: Iterable<A>, b: Iterable<B>): Stream<[A, B]> {
-    return Stream.from(zip(a, b));
+    return new Stream(zip(a, b));
   }
 
   [Symbol.iterator](): Iterator<T> {
@@ -45,19 +46,19 @@ class Stream<T> implements Iterable<T> {
   }
 
   map<R>(m: (v: T, index: number) => R): Stream<R> {
-    return Stream.from(map(m)(this));
+    return new Stream(map(m)(this));
   }
 
   flatMap<R>(m: (v: T) => Iterable<R>): Stream<R> {
-    return Stream.from(flatMap(m)(this));
+    return new Stream(flatMap(m)(this));
   }
 
   scanLeft<R>(init: R, op: (b: R, e: T) => R): Stream<R> {
-    return Stream.from(scanLeft(init, op)(this));
+    return new Stream(scanLeft(init, op)(this));
   }
 
   filter(f: (e: T, index: number) => boolean): Stream<T> {
-    return Stream.from(filter(f)(this));
+    return new Stream(filter(f)(this));
   }
 
   filterNot(f: (e: T, index: number) => boolean): Stream<T> {
@@ -94,6 +95,10 @@ class Stream<T> implements Iterable<T> {
 
   zipWithIndex(): Stream<[T, number]> {
     return new Stream(zipWithIndex<T>()(this));
+  }
+
+  chunkPairs(num: number = 2): Stream<T[]> {
+    return new Stream(chunkPairs(this, num));
   }
 
   // -------------------------collectors-----------------------

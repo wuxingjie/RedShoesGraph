@@ -3,7 +3,7 @@ import { XY } from "../commonTypes.ts";
 import { Layer } from "./layer.ts";
 import { Stage } from "./stage.ts";
 import { computed, observable } from "../utils/observable.ts";
-import { Transformer } from "./Transformer.ts";
+import { Transformer } from "./transformer.ts";
 import { degreesToArc } from "./utils.ts";
 
 export interface NodeOptions<Datum = unknown> {
@@ -87,8 +87,16 @@ export abstract class Node<Options extends NodeOptions = NodeOptions>
     this._options = observable(options);
   }
 
-  getOption<T extends keyof Options>(name: T): Options[T] | undefined {
-    return this._options[name];
+  getOption<T extends keyof Options>(name: T): Options[T];
+  getOption<T extends keyof Options>(
+    name: T,
+    def: Options[T],
+  ): Exclude<Options[T], undefined>;
+  getOption<T extends keyof Options>(
+    name: T,
+    def?: Options[T],
+  ): Options[T] | Exclude<Options[T], undefined> {
+    return this._options[name] ?? def!;
   }
 
   setOption<T extends keyof Options>(name: T, value: Options[T]): this {

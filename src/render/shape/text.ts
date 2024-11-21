@@ -1,6 +1,7 @@
 import { Shape, ShapeOptions } from "./shape.ts";
-import { Canvas, Context2D } from "../canvas.ts";
+import { Context2D } from "../canvas.ts";
 import { computed } from "../../utils/observable.ts";
+import { last } from "../../utils/array.ts";
 
 const defaultFontSize = 12;
 
@@ -18,10 +19,15 @@ export interface TextOptions
   textDecoration?: "line-through" | "underline" | "overline";
   verticalAlign?: "top" | "bottom" | "middle";
   padding?: number;
-  wrap?: string;
+  wrap?: "anywhere" | "break-word";
   ellipsis?: boolean;
 }
 
+type LinesToDraw = {
+  line: string;
+  translateY: number;
+  textMetrics: TextMetrics;
+}[];
 /**
  * 参考
  * @see
@@ -96,38 +102,183 @@ export class Text extends Shape<TextOptions> {
   }
 
   override applyContext(context: Context2D): void | Path2D {
-    context.apply(this.applyTextStyle).apply((ctx) => {
-      const x = this.x() ?? 0,
-        y = this.y() ?? 0,
-        width = this.width(),
-        height = this.height();
+    const text = this.text();
+    if (text === undefined) {
+      return;
+    }
+    context
+      .apply((nativeCtx) => this.applyTextStyle(nativeCtx))
+      .apply((ctx) => {
+        const width = this.width(),
+          height = this.height();
 
+        const verticalAlign = this.getOption("verticalAlign");
+        if (verticalAlign && height) {
+          switch (verticalAlign) {
+            case "middle": {
+              ctx.translate(0, height >> 1);
+              break;
+            }
+            case "bottom": {
+              ctx.translate(0, height);
+              break;
+            }
+            case "top":
+            default: {
+              ctx.translate(0, 0);
+            }
+          }
+        }
+
+        const fixedWidth = width !== undefined;
+        if (fixedWidth) {
+          const maxWidth = width;
+          const lines = text.split("\n");
+          const linesToDraw: LinesToDraw = [];
+          let currentTotalHeight = 0;
+
+          for (let line of lines) {
+            let textMetrics = measureText(ctx, line);
+            let [lineWidth, lineHeight] = getTextWidthHeight(textMetrics);
+            if (lineWidth > maxWidth) {
+              while (line.length > 0) {
+                let low = 0,
+                  high = line.length,
+                  match = "";
+                //matchWidth = 0;
+                while (low < high) {
+                  const mid = (low + high) >> 1;
+                  const subStr = line.slice(0, mid + 1);
+                  textMetrics = measureText(ctx, subStr);
+                  const subStrWidth = getTextWidth(textMetrics);
+                  if (subStrWidth <= maxWidth) {
+                    low = mid + 1;
+                    match = subStr;
+                    //matchWidth = subStrWidth;
+                  } else {
+                    high = mid;
+                  }
+                }
+                if (match) {
+                  addLineToDraw(
+                    linesToDraw,
+                    match,
+                    currentTotalHeight,
+                    textMetrics,
+                  );
+                  currentTotalHeight += lineHeight;
+                  if (
+                    this._shouldHandleEllipsis(currentTotalHeight, lineHeight)
+                  ) {
+                    this._tryToAddEllipsisToLastLine(linesToDraw, ctx);
+                    break;
+                  }
+                  line = line.slice(low);
+                  if (line.length > 0) {
+                    textMetrics = measureText(ctx, line);
+                    [lineWidth, lineHeight] = getTextWidthHeight(textMetrics);
+                    if (lineWidth <= maxWidth) {
+                      addLineToDraw(
+                        linesToDraw,
+                        line,
+                        currentTotalHeight,
+                        textMetrics,
+                      );
+                      currentTotalHeight += lineHeight;
+                      break;
+                    }
+                  }
+                } else {
+                  break;
+                }
+              }
+            } else {
+              addLineToDraw(linesToDraw, line, currentTotalHeight, textMetrics);
+              currentTotalHeight += lineHeight;
+              if (this._shouldHandleEllipsis(currentTotalHeight, lineHeight)) {
+                this._tryToAddEllipsisToLastLine(linesToDraw, ctx);
+                break;
+              }
+            }
+          } // end line loop
+          linesToDraw.forEach((line) => this._fillAndStroke(context, line));
+        } else {
+          this._fillAndStroke(context, {
+            line: text,
+            translateY: 0,
+            textMetrics: measureText(ctx, text),
+          });
+        }
+      });
+  }
+  private _shouldHandleEllipsis(
+    currentTotalHeight: number,
+    lineHeight: number,
+  ) {
+    const maxHeight = this.height();
+    const wrap = this.getOption("wrap");
+    return (
+      maxHeight !== undefined &&
+      wrap !== undefined &&
+      currentTotalHeight + lineHeight > maxHeight
+    );
+  }
+
+  private _tryToAddEllipsisToLastLine(
+    lines: LinesToDraw,
+    ctx: CanvasRenderingContext2D,
+  ) {
+    const maxWidth = this.width()!;
+    let lastLine = last(lines);
+    let lastLineText = lastLine?.line;
+    if (lastLine && lastLineText) {
+      const haveSpace =
+        getTextWidth(measureText(ctx, lastLineText + "...")) < maxWidth;
+      if (haveSpace) {
+        lastLineText += "...";
+      } else {
+        lastLineText = lastLineText.slice(0, lastLineText.length - 3) + "...";
+      }
+      lastLine.line = lastLineText;
+    }
+  }
+
+  private _fillAndStroke(context: Context2D, line: LinesToDraw[0]): void {
+    context.apply((ctx) => {
+      const x = this.x() ?? 0,
+        y = this.y()! + line.translateY;
+      if (this.fillStyle()) {
+        ctx.fillText(line.line, x, y);
+      }
+      if (this.strokeStyle()) {
+        ctx.strokeText(line.line, x, y);
+      }
       // 绘制文本装饰, 下划线之类的
       const textDecoration = this.getOption("textDecoration");
-      const textMetrics = ctx.measureText(this.text()!);
-      const textWidth =
-        Math.abs(textMetrics.actualBoundingBoxLeft) +
-        Math.abs(textMetrics.actualBoundingBoxRight);
-      /*const textHeight =
-        textMetrics.actualBoundingBoxAscent +
-        textMetrics.actualBoundingBoxDescent;*/
-      if (textDecoration) {
-        /*const bounds = {
-          top: y - textMetrics.actualBoundingBoxAscent,
-          right: x + textMetrics.actualBoundingBoxRight,
-          bottom: y + textMetrics.actualBoundingBoxDescent,
-          left: x - textMetrics.actualBoundingBoxLeft
-        };*/
 
+      if (textDecoration) {
+        /*const textHeight =
+     textMetrics.actualBoundingBoxAscent +
+     textMetrics.actualBoundingBoxDescent;*/
+        /*const bounds = {
+        top: y - textMetrics.actualBoundingBoxAscent,
+        right: x + textMetrics.actualBoundingBoxRight,
+        bottom: y + textMetrics.actualBoundingBoxDescent,
+        left: x - textMetrics.actualBoundingBoxLeft
+      };*/
+        const textMetrics = line.textMetrics;
+        const textWidth =
+          Math.abs(textMetrics.actualBoundingBoxLeft) +
+          Math.abs(textMetrics.actualBoundingBoxRight);
         const actualY =
           textDecoration === "underline"
             ? y + textMetrics.actualBoundingBoxDescent
             : textDecoration === "line-through"
-              ? (y -
-                  textMetrics.actualBoundingBoxAscent +
-                  (textMetrics.actualBoundingBoxAscent +
-                    textMetrics.actualBoundingBoxDescent)) >>
-                1
+              ? y -
+                textMetrics.actualBoundingBoxAscent +
+                ((textMetrics.actualBoundingBoxAscent +
+                  textMetrics.actualBoundingBoxDescent) >>
+                  1)
               : textDecoration === "overline"
                 ? y - textMetrics.actualBoundingBoxAscent
                 : y;
@@ -136,84 +287,6 @@ export class Text extends Shape<TextOptions> {
         ctx.lineTo(x + textWidth, actualY); // 终点（x + 文本宽度, y）
         ctx.stroke();
       }
-
-      /*
-        文本横向对齐 "center" | "end" | "left" | "right" | "start";
-        start：文本的起始点在指定的 x 坐标上，具体行为依赖于文本的方向（如从左到右或从右到左）。
-        end：文本的结束点在指定的 x 坐标上，同样依赖于文本的方向。
-       */
-      const textAlign = this.getOption("textAlign");
-      if (textAlign) {
-        const actualWidth = width ?? textWidth;
-        switch (textAlign) {
-          case "center":
-            ctx.translate(actualWidth >> 1, 0);
-            break;
-          case "right":
-          case "end":
-            ctx.translate(actualWidth, 0);
-            break;
-          case "left":
-          case "start":
-          default:
-            ctx.translate(0, 0);
-            break;
-        }
-      }
-      const verticalAlign = this.getOption("verticalAlign");
-      if (verticalAlign && height) {
-        switch (verticalAlign) {
-          case "middle": {
-            ctx.translate(0, height >> 1);
-            break;
-          }
-          case "bottom": {
-            ctx.translate(0, height);
-            break;
-          }
-          case "top":
-          default: {
-            ctx.translate(0, 0);
-          }
-        }
-      }
-
-      const wrap = this.getOption("wrap");
-      const texts: string[] = [];
-      if (wrap && width) {
-        const getTextWidth = (text: string) => {
-          return context.apply<TextMetrics>(Context2D.measureText(text)).width;
-        };
-        const maxWidth = width;
-        const lines = this.text()!.split("\n");
-        for (const line of lines) {
-          const lineWidth = getTextWidth(line);
-          if (lineWidth > maxWidth) {
-            let low = 0,
-              high = line.length,
-              match = "",
-              matchWidth = 0;
-            while (low < high) {
-              const mid = (low + high) >> 1;
-              const subStr = line.slice(0, mid);
-              const subStrWidth = getTextWidth(subStr);
-              if (subStrWidth <= maxWidth) {
-                low = mid + 1;
-                match = subStr;
-                matchWidth = subStrWidth;
-              } else {
-                high = mid;
-              }
-            }
-            if (match) {
-              texts.push(match);
-            }
-          }
-        }
-      } else {
-      }
-
-      // render
     });
   }
 
@@ -222,26 +295,16 @@ export class Text extends Shape<TextOptions> {
     this._font.destroy();
   }
 
-  protected doFill(context: Context2D, _?: Path2D): void | Path2D {
-    context.apply((nativeContext) => {
-      const text = this.text();
-      nativeContext.fillText(text!, this.x()!, this.y()!);
-    });
+  protected override doFill(_: Context2D, __?: Path2D): void | Path2D {}
+
+  protected override doStoke(_: Context2D, __?: Path2D): void | Path2D {}
+
+  override hasFill(): boolean {
+    return false;
   }
 
-  protected doStoke(context: Context2D, _?: Path2D): void | Path2D {
-    context.apply((nativeContext) => {
-      const text = this.text();
-      nativeContext.strokeText(text!, this.x()!, this.y()!);
-    });
-  }
-
-  hasFill(): boolean {
-    return super.hasFill() && !!this.text();
-  }
-
-  hasStroke(): boolean {
-    return super.hasStroke() && !!this.text();
+  override hasStroke(): boolean {
+    return false;
   }
 
   text(): TextOptions["text"];
@@ -251,4 +314,36 @@ export class Text extends Shape<TextOptions> {
     this.setOption("text", key);
     return this;
   }
+} // end class
+
+function measureText(ctx: CanvasRenderingContext2D, text: string) {
+  return ctx.measureText(text);
+}
+
+function getTextWidthHeight(textMetrics: TextMetrics): [number, number] {
+  return [
+    getTextWidth(textMetrics),
+    textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent,
+  ];
+}
+
+function getTextWidth(textMetrics: TextMetrics): number {
+  return textMetrics.width;
+  /*return [
+    Math.abs(textMetrics.actualBoundingBoxLeft) +
+      Math.abs(textMetrics.actualBoundingBoxRight),
+  ];*/
+}
+
+function addLineToDraw(
+  lines: LinesToDraw,
+  line: string,
+  translateY: number,
+  textMetrics: TextMetrics,
+) {
+  lines.push({
+    line: line,
+    translateY: translateY,
+    textMetrics,
+  });
 }

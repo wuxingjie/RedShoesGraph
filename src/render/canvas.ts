@@ -29,7 +29,7 @@ export class Canvas {
 
 export type NativeContext2DCallback<T> = (
   nativeCtx: CanvasRenderingContext2D,
-) => void | T;
+) => T;
 
 export class Context2D {
   constructor(private ctx: CanvasRenderingContext2D) {}
@@ -92,11 +92,12 @@ export class Context2D {
     return (ctx) => ctx.measureText(str);
   }
 
-  apply(fn: (nativeCtx: CanvasRenderingContext2D) => void): this;
-  apply<T>(fn: NativeContext2DCallback<T>): T;
-  apply<T>(fn: NativeContext2DCallback<T>): this | T {
-    // 因为效率原因直接返回,不做void判断
-    // @ts-ignore
+  apply(fn: NativeContext2DCallback<void>): this {
+    fn(this.ctx);
+    return this;
+  }
+
+  call<T>(fn: NativeContext2DCallback<T>): T {
     return fn(this.ctx);
   }
 }
